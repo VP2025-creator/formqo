@@ -1,13 +1,31 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   Plus, Trash2, GripVertical, ChevronDown, Eye,
   AlignLeft, AlignJustify, List, Star, Mail, ToggleLeft,
   Hash, Calendar, ChevronRight, ChevronUp, ArrowLeft,
-  Settings, Share2, Check, X, MoreHorizontal, Smartphone, Monitor
+  Settings, Share2, Check, X, MoreHorizontal, Smartphone, Monitor,
+  Sparkles, Loader2, Copy, Code2, Link2, QrCode
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { Question, QuestionType, Form, QuestionOption } from "@/types/form";
 import { mockForms } from "@/data/mockForms";
+import { toast } from "sonner";
+
+// ─── Formqo subdomain constants ──────────────────────────────────────────────
+// share.formqo.com/f/{id}   — public form renderer (Cloudflare Worker)
+// embed.formqo.com/{id}.js  — embed loader JS snippet
+
+const SHARE_BASE = "https://share.formqo.com/f";
+const EMBED_BASE = "https://embed.formqo.com";
+
+function getShareUrl(formId: string) {
+  return `${SHARE_BASE}/${formId}`;
+}
+
+function getEmbedSnippet(formId: string) {
+  return `<div id="formqo-${formId}"></div>\n<script src="${EMBED_BASE}/${formId}.js" async></script>`;
+}
 
 // ─── Question type config ────────────────────────────────────────────────────
 
@@ -54,6 +72,305 @@ function defaultQuestion(type: QuestionType): Question {
   if (type === "rating") base.maxRating = 5;
   if (type === "multiple_choice") base.allowMultiple = false;
   return base;
+}
+
+// ─── AI Suggestion types ─────────────────────────────────────────────────────
+
+interface AISuggestion {
+  title: string;
+  type: QuestionType;
+  required: boolean;
+  options?: string[];
+}
+
+// ─── Share Modal ─────────────────────────────────────────────────────────────
+
+function ShareModal({ form, onClose }: { form: Form; onClose: () => void }) {
+  const [tab, setTab] = useState<"link" | "embed" | "qr">("link");
+  const shareUrl = getShareUrl(form.id);
+  const embedSnippet = getEmbedSnippet(form.id);
+
+  const copy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast.success(`${label} copied to clipboard`);
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Modal */}
+      <div className="relative bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <div>
+            <h2 className="font-display font-bold text-lg">Share form</h2>
+            <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-xs">{form.title}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-border px-6">
+          {(["link", "embed", "qr"] as const).map((t) => {
+            const icons = { link: Link2, embed: Code2, qr: QrCode };
+            const labels = { link: "Link", embed: "Embed", qr: "QR Code" };
+            const Icon = icons[t];
+            return (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`flex items-center gap-1.5 px-4 py-3 text-sm font-semibold border-b-2 transition-colors -mb-px ${
+                  tab === t
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Icon size={13} />
+                {labels[t]}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Content */}
+        <div className="px-6 py-6">
+          {tab === "link" && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  Public URL
+                </label>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Hosted on <span className="font-mono font-medium text-foreground">share.formqo.com</span> — fully rendered with OG tags and canonical URLs.
+                </p>
+                <div className="flex gap-2">
+                  <div className="flex-1 px-4 py-2.5 rounded-xl border border-border bg-muted/30 text-sm font-mono text-foreground truncate">
+                    {shareUrl}
+                  </div>
+                  <button
+                    onClick={() => copy(shareUrl, "Link")}
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-border bg-card hover:bg-muted transition-colors text-sm font-medium shrink-0"
+                  >
+                    <Copy size={13} /> Copy
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-muted/30 border border-border">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                  <span className="text-xs font-semibold text-foreground">share.formqo.com</span>
+                </div>
+                <ul className="space-y-1">
+                  {["Fully rendered HTML for embeds & social", "Open Graph + canonical URL injection", "Custom domain routing (CNAME → Worker)", "Cookie session shared via .formqo.com"].map((item) => (
+                    <li key={item} className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Check size={11} className="text-green-500 shrink-0" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <a
+                href={shareUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl btn-primary text-sm font-semibold"
+              >
+                <Eye size={14} /> Open form
+              </a>
+            </div>
+          )}
+
+          {tab === "embed" && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  Embed snippet
+                </label>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Paste this into any HTML page. The script loads from{" "}
+                  <span className="font-mono font-medium text-foreground">embed.formqo.com</span> and injects the form.
+                </p>
+                <div className="relative">
+                  <pre className="px-4 py-4 rounded-xl border border-border bg-foreground text-green-400 text-xs font-mono leading-relaxed overflow-x-auto whitespace-pre-wrap break-all">
+                    {embedSnippet}
+                  </pre>
+                  <button
+                    onClick={() => copy(embedSnippet, "Embed code")}
+                    className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white text-xs font-medium"
+                  >
+                    <Copy size={11} /> Copy
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-muted/30 border border-border">
+                <p className="text-xs font-semibold text-foreground mb-1">How it works</p>
+                <p className="text-xs text-muted-foreground">
+                  The loader script at <span className="font-mono">embed.formqo.com/{form.id}.js</span> injects a
+                  sandboxed iframe pointing to <span className="font-mono">share.formqo.com</span>. Custom domain support
+                  via CNAME → Worker is available on Pro.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {tab === "qr" && (
+            <div className="flex flex-col items-center gap-5">
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 text-center">
+                  QR Code
+                </label>
+                <p className="text-xs text-muted-foreground text-center">
+                  Scan to open on <span className="font-mono font-medium text-foreground">share.formqo.com</span>
+                </p>
+              </div>
+
+              <div className="p-5 bg-white rounded-2xl border border-border shadow-sm">
+                <QRCodeSVG
+                  value={shareUrl}
+                  size={200}
+                  bgColor="#ffffff"
+                  fgColor="#1a1a2e"
+                  level="M"
+                  includeMargin={false}
+                />
+              </div>
+
+              <p className="text-xs text-muted-foreground font-mono text-center break-all max-w-xs">{shareUrl}</p>
+
+              <button
+                onClick={() => {
+                  const svg = document.querySelector(".qr-svg-container svg");
+                  if (!svg) return;
+                  const svgData = new XMLSerializer().serializeToString(svg);
+                  const blob = new Blob([svgData], { type: "image/svg+xml" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `formqo-${form.id}-qr.svg`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl border border-border hover:bg-muted transition-colors text-sm font-medium"
+              >
+                <QrCode size={13} /> Download SVG
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── AI Suggestion Panel ─────────────────────────────────────────────────────
+
+function AISuggestionPanel({
+  suggestions,
+  loading,
+  error,
+  onAdd,
+  onAddAll,
+  onDismiss,
+}: {
+  suggestions: AISuggestion[];
+  loading: boolean;
+  error: string | null;
+  onAdd: (s: AISuggestion) => void;
+  onAddAll: () => void;
+  onDismiss: () => void;
+}) {
+  if (!loading && suggestions.length === 0 && !error) return null;
+
+  return (
+    <div className="border border-primary/20 bg-primary/3 rounded-2xl overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-primary/10">
+        <div className="flex items-center gap-1.5 flex-1">
+          <Sparkles size={13} className="text-primary" />
+          <span className="text-xs font-semibold text-primary">AI suggestions</span>
+          {loading && <Loader2 size={11} className="text-primary animate-spin" />}
+        </div>
+        {suggestions.length > 0 && !loading && (
+          <button
+            onClick={onAddAll}
+            className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
+          >
+            Add all
+          </button>
+        )}
+        <button
+          onClick={onDismiss}
+          className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <X size={12} />
+        </button>
+      </div>
+
+      {loading && (
+        <div className="px-4 py-5 flex items-center gap-3">
+          <div className="flex gap-1">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="w-1.5 h-1.5 rounded-full bg-primary/50 animate-bounce"
+                style={{ animationDelay: `${i * 150}ms` }}
+              />
+            ))}
+          </div>
+          <span className="text-xs text-muted-foreground">Generating questions…</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="px-4 py-3 text-xs text-destructive">{error}</div>
+      )}
+
+      {!loading && suggestions.length > 0 && (
+        <div className="divide-y divide-border/50">
+          {suggestions.map((s, i) => {
+            const Icon = TYPE_ICONS[s.type] ?? AlignLeft;
+            const typeDef = QUESTION_TYPES.find(t => t.type === s.type);
+            return (
+              <div
+                key={i}
+                className="flex items-start gap-3 px-4 py-3 group hover:bg-primary/5 transition-colors"
+              >
+                <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Icon size={11} className="text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground leading-snug">{s.title}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs text-muted-foreground">{typeDef?.label}</span>
+                    {s.required && (
+                      <span className="text-xs text-primary font-medium">required</span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => onAdd(s)}
+                  className="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-all shrink-0 mt-0.5"
+                >
+                  <Plus size={12} /> Add
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Question Type Picker ────────────────────────────────────────────────────
@@ -291,7 +608,7 @@ function LivePreview({ form, activeIdx, device }: { form: Form; activeIdx: numbe
           <div className="w-full h-0.5 bg-white/10 shrink-0">
             <div
               className="h-full bg-white transition-all"
-              style={{ width: `${((activeIdx + 1) / form.questions.length) * 100}%` }}
+              style={{ width: `${((activeIdx + 1) / Math.max(form.questions.length, 1)) * 100}%` }}
             />
           </div>
 
@@ -308,7 +625,6 @@ function LivePreview({ form, activeIdx, device }: { form: Form; activeIdx: numbe
                 </h3>
                 {q.description && <p className="text-white/50 text-xs mb-4">{q.description}</p>}
 
-                {/* Preview of input */}
                 {(q.type === "short_text" || q.type === "email" || q.type === "number") && (
                   <div className="border-b border-white/25 pb-2 text-white/30 text-sm">
                     {q.placeholder || "Type your answer here..."}
@@ -446,11 +762,12 @@ function QuestionListItem({
 
 // ─── Main FormBuilder ─────────────────────────────────────────────────────────
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+
 const FormBuilder = () => {
   const [searchParams] = useSearchParams();
   const formId = searchParams.get("id");
 
-  // Initialise from mock if id provided, else blank
   const initial: Form = formId
     ? (mockForms.find((f) => f.id === formId) ?? {
         id: uid(),
@@ -477,7 +794,115 @@ const FormBuilder = () => {
   const [showTypeMenu, setShowTypeMenu] = useState(false);
   const [saved, setSaved] = useState(false);
   const [activePanel, setActivePanel] = useState<"editor" | "settings">("editor");
+  const [showShareModal, setShowShareModal] = useState(false);
+
+  // AI suggestion state
+  const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiDismissed, setAiDismissed] = useState(false);
+  const [lastFetchedTitle, setLastFetchedTitle] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const titleRef = useRef<HTMLInputElement>(null);
+
+  // Debounced AI suggestions on title change
+  const fetchSuggestions = useCallback(async (title: string) => {
+    if (title.trim().length < 5) return;
+    if (title === lastFetchedTitle) return;
+
+    setLastFetchedTitle(title);
+    setAiLoading(true);
+    setAiError(null);
+    setAiDismissed(false);
+
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/suggest-questions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ title }),
+      });
+
+      if (!res.ok) {
+        if (res.status === 429) {
+          setAiError("Rate limit reached. Try again in a moment.");
+        } else if (res.status === 402) {
+          setAiError("AI usage limit reached. Please add credits.");
+        } else {
+          setAiError("Could not load suggestions.");
+        }
+        setAiLoading(false);
+        return;
+      }
+
+      const data = await res.json();
+      const suggestions: AISuggestion[] = (data.suggestions ?? []).filter(
+        (s: AISuggestion) => s.title && s.type
+      );
+      setAiSuggestions(suggestions);
+    } catch {
+      setAiError("Could not load suggestions.");
+    } finally {
+      setAiLoading(false);
+    }
+  }, [lastFetchedTitle]);
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setForm({ ...form, title: val });
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (val.trim().length >= 5) {
+      debounceRef.current = setTimeout(() => fetchSuggestions(val), 800);
+    } else {
+      setAiSuggestions([]);
+      setAiLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, []);
+
+  const addSuggestedQuestion = useCallback((s: AISuggestion) => {
+    const q: Question = {
+      id: uid(),
+      type: s.type,
+      title: s.title,
+      required: s.required ?? false,
+      options: s.options
+        ? s.options.map((label) => ({ id: uid(), label }))
+        : (s.type === "multiple_choice" ? [{ id: uid(), label: "Option 1" }, { id: uid(), label: "Option 2" }] : undefined),
+      maxRating: s.type === "rating" ? 5 : undefined,
+    };
+    const qs = [...form.questions, q];
+    setForm({ ...form, questions: qs });
+    setActiveIdx(qs.length - 1);
+    // Remove added suggestion
+    setAiSuggestions(prev => prev.filter(p => p.title !== s.title));
+    toast.success(`Added: "${s.title.slice(0, 40)}${s.title.length > 40 ? "…" : ""}"`);
+  }, [form]);
+
+  const addAllSuggestions = useCallback(() => {
+    const newQs: Question[] = aiSuggestions.map((s) => ({
+      id: uid(),
+      type: s.type,
+      title: s.title,
+      required: s.required ?? false,
+      options: s.options
+        ? s.options.map((label) => ({ id: uid(), label }))
+        : (s.type === "multiple_choice" ? [{ id: uid(), label: "Option 1" }, { id: uid(), label: "Option 2" }] : undefined),
+      maxRating: s.type === "rating" ? 5 : undefined,
+    }));
+    const qs = [...form.questions, ...newQs];
+    setForm({ ...form, questions: qs });
+    setActiveIdx(qs.length - 1);
+    setAiSuggestions([]);
+    toast.success(`Added ${newQs.length} questions`);
+  }, [form, aiSuggestions]);
 
   const updateQuestion = (idx: number, q: Question) => {
     const qs = [...form.questions];
@@ -508,322 +933,357 @@ const FormBuilder = () => {
   };
 
   const handleSave = () => {
-    // Placeholder for backend save
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
   const activeQuestion = form.questions[activeIdx];
+  const showAiPanel = !aiDismissed && (aiLoading || aiSuggestions.length > 0 || aiError !== null);
 
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden">
-      {/* ── Top bar ── */}
-      <header className="h-14 border-b border-border bg-card flex items-center px-4 gap-4 shrink-0 z-40">
-        <Link
-          to="/dashboard"
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
-        >
-          <ArrowLeft size={15} />
-          <span className="hidden sm:inline">Dashboard</span>
-        </Link>
+    <>
+      {showShareModal && (
+        <ShareModal form={form} onClose={() => setShowShareModal(false)} />
+      )}
 
-        <div className="w-px h-5 bg-border shrink-0" />
-
-        {/* Editable title */}
-        <input
-          ref={titleRef}
-          value={form.title}
-          onChange={(e) => setForm({ ...form, title: e.target.value })}
-          className="font-display font-semibold text-sm bg-transparent border-none outline-none focus:ring-2 focus:ring-primary/20 focus:bg-muted/30 px-2 py-1 rounded-lg transition-all flex-1 min-w-0 max-w-xs"
-          placeholder="Untitled form"
-        />
-
-        <div className="ml-auto flex items-center gap-2">
-          {/* Status badge */}
-          <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-            form.status === "active" ? "bg-green-50 text-green-700" :
-            form.status === "closed" ? "bg-muted text-muted-foreground" :
-            "bg-amber-50 text-amber-700"
-          }`}>
-            {form.status}
-          </span>
-
-          <a
-            href={`/f/${form.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-outline flex items-center gap-1.5 text-xs py-2 px-3"
+      <div className="h-screen flex flex-col bg-background overflow-hidden">
+        {/* ── Top bar ── */}
+        <header className="h-14 border-b border-border bg-card flex items-center px-4 gap-4 shrink-0 z-40">
+          <Link
+            to="/dashboard"
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
           >
-            <Eye size={13} /> Preview
-          </a>
+            <ArrowLeft size={15} />
+            <span className="hidden sm:inline">Dashboard</span>
+          </Link>
 
-          <button
-            onClick={handleSave}
-            className={`flex items-center gap-1.5 text-xs py-2 px-4 rounded-lg font-semibold transition-all ${
-              saved
-                ? "bg-green-600 text-white"
-                : "btn-primary"
-            }`}
-          >
-            {saved ? <><Check size={13} /> Saved</> : "Save"}
-          </button>
+          <div className="w-px h-5 bg-border shrink-0" />
 
-          <button className="btn-primary flex items-center gap-1.5 text-xs py-2 px-4">
-            <Share2 size={13} /> Publish
-          </button>
-        </div>
-      </header>
+          {/* Editable title */}
+          <input
+            ref={titleRef}
+            value={form.title}
+            onChange={handleTitleChange}
+            className="font-display font-semibold text-sm bg-transparent border-none outline-none focus:ring-2 focus:ring-primary/20 focus:bg-muted/30 px-2 py-1 rounded-lg transition-all flex-1 min-w-0 max-w-xs"
+            placeholder="Untitled form"
+          />
 
-      {/* ── Body ── */}
-      <div className="flex-1 flex overflow-hidden">
+          {/* AI loading indicator in topbar */}
+          {aiLoading && (
+            <div className="flex items-center gap-1.5 text-xs text-primary">
+              <Sparkles size={12} className="animate-pulse" />
+              <span className="hidden sm:inline">Generating suggestions…</span>
+            </div>
+          )}
 
-        {/* ── Left: Question list ── */}
-        <aside className="w-64 border-r border-border bg-card flex flex-col shrink-0 overflow-hidden">
-          <div className="px-3 pt-3 pb-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1 mb-2">
-              Questions
-            </p>
-          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+              form.status === "active" ? "bg-green-50 text-green-700" :
+              form.status === "closed" ? "bg-muted text-muted-foreground" :
+              "bg-amber-50 text-amber-700"
+            }`}>
+              {form.status}
+            </span>
 
-          <div className="flex-1 overflow-y-auto px-2 space-y-1">
-            {form.questions.length === 0 && (
-              <div className="text-center py-10 px-4">
-                <p className="text-muted-foreground text-sm mb-1">No questions yet</p>
-                <p className="text-muted-foreground text-xs">Add your first question below</p>
-              </div>
-            )}
-            {form.questions.map((q, idx) => (
-              <QuestionListItem
-                key={q.id}
-                question={q}
-                index={idx}
-                isActive={idx === activeIdx}
-                onSelect={() => setActiveIdx(idx)}
-                onMoveUp={() => moveQuestion(idx, idx - 1)}
-                onMoveDown={() => moveQuestion(idx, idx + 1)}
-                onDelete={() => deleteQuestion(idx)}
-                canMoveUp={idx > 0}
-                canMoveDown={idx < form.questions.length - 1}
-              />
-            ))}
-          </div>
-
-          {/* Add question button */}
-          <div className="p-3 border-t border-border relative">
-            <button
-              onClick={() => setShowTypeMenu(!showTypeMenu)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/3 text-muted-foreground hover:text-primary text-sm font-medium transition-all"
+            <a
+              href={`/f/${form.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-outline flex items-center gap-1.5 text-xs py-2 px-3"
             >
-              <Plus size={15} />
-              Add question
+              <Eye size={13} /> Preview
+            </a>
+
+            <button
+              onClick={handleSave}
+              className={`flex items-center gap-1.5 text-xs py-2 px-4 rounded-lg font-semibold transition-all ${
+                saved
+                  ? "bg-green-600 text-white"
+                  : "btn-primary"
+              }`}
+            >
+              {saved ? <><Check size={13} /> Saved</> : "Save"}
             </button>
 
-            {showTypeMenu && (
-              <div className="absolute bottom-full left-2 right-2 mb-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden z-50 max-h-80 overflow-y-auto">
-                {QUESTION_TYPES.map((t) => {
-                  const TIcon = t.icon;
-                  return (
-                    <button
-                      key={t.type}
-                      onClick={() => addQuestion(t.type)}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/60 transition-colors text-left"
-                    >
-                      <TIcon size={14} className="text-primary shrink-0" />
-                      <div>
-                        <p className="text-sm font-medium">{t.label}</p>
-                        <p className="text-xs text-muted-foreground">{t.description}</p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="btn-primary flex items-center gap-1.5 text-xs py-2 px-4"
+            >
+              <Share2 size={13} /> Share
+            </button>
           </div>
-        </aside>
+        </header>
 
-        {/* ── Center: Question editor ── */}
-        <main className="flex-1 overflow-y-auto bg-background">
-          {/* Tab strip */}
-          <div className="border-b border-border px-6 flex gap-1 bg-card">
-            {(["editor", "settings"] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActivePanel(tab)}
-                className={`px-4 py-3 text-sm font-semibold capitalize border-b-2 transition-colors -mb-px ${
-                  activePanel === tab
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {tab === "editor" ? "Questions" : "Settings"}
-              </button>
-            ))}
-          </div>
+        {/* ── Body ── */}
+        <div className="flex-1 flex overflow-hidden">
 
-          {/* Questions editor */}
-          {activePanel === "editor" && (
-            activeQuestion ? (
-              <div className="max-w-2xl mx-auto px-6 py-8">
-                <QuestionEditor
-                  question={activeQuestion}
-                  index={activeIdx}
-                  onChange={(q) => updateQuestion(activeIdx, q)}
-                />
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-center px-8">
-                <div className="w-16 h-16 rounded-2xl bg-primary/8 flex items-center justify-center mb-5">
-                  <Plus size={24} className="text-primary" />
+          {/* ── Left: Question list ── */}
+          <aside className="w-64 border-r border-border bg-card flex flex-col shrink-0 overflow-hidden">
+            <div className="px-3 pt-3 pb-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1 mb-2">
+                Questions
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-2 space-y-1">
+              {form.questions.length === 0 && (
+                <div className="text-center py-10 px-4">
+                  <p className="text-muted-foreground text-sm mb-1">No questions yet</p>
+                  <p className="text-muted-foreground text-xs">Add your first question below</p>
                 </div>
-                <h2 className="font-display font-bold text-xl text-foreground mb-2">Add your first question</h2>
-                <p className="text-muted-foreground text-sm mb-6 max-w-xs">
-                  Choose a question type from the sidebar to get started.
-                </p>
-                <div className="grid grid-cols-2 gap-2 max-w-sm">
-                  {QUESTION_TYPES.slice(0, 6).map((t) => {
+              )}
+              {form.questions.map((q, idx) => (
+                <QuestionListItem
+                  key={q.id}
+                  question={q}
+                  index={idx}
+                  isActive={idx === activeIdx}
+                  onSelect={() => setActiveIdx(idx)}
+                  onMoveUp={() => moveQuestion(idx, idx - 1)}
+                  onMoveDown={() => moveQuestion(idx, idx + 1)}
+                  onDelete={() => deleteQuestion(idx)}
+                  canMoveUp={idx > 0}
+                  canMoveDown={idx < form.questions.length - 1}
+                />
+              ))}
+            </div>
+
+            {/* Add question button */}
+            <div className="p-3 border-t border-border relative">
+              <button
+                onClick={() => setShowTypeMenu(!showTypeMenu)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/3 text-muted-foreground hover:text-primary text-sm font-medium transition-all"
+              >
+                <Plus size={15} />
+                Add question
+              </button>
+
+              {showTypeMenu && (
+                <div className="absolute bottom-full left-2 right-2 mb-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden z-50 max-h-80 overflow-y-auto">
+                  {QUESTION_TYPES.map((t) => {
                     const TIcon = t.icon;
                     return (
                       <button
                         key={t.type}
                         onClick={() => addQuestion(t.type)}
-                        className="flex items-center gap-2 px-4 py-3 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/3 transition-all text-sm font-medium text-left"
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/60 transition-colors text-left"
                       >
-                        <TIcon size={14} className="text-primary" />
-                        {t.label}
+                        <TIcon size={14} className="text-primary shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium">{t.label}</p>
+                          <p className="text-xs text-muted-foreground">{t.description}</p>
+                        </div>
                       </button>
                     );
                   })}
                 </div>
-              </div>
-            )
-          )}
+              )}
+            </div>
+          </aside>
 
-          {/* Settings panel */}
-          {activePanel === "settings" && (
-            <div className="max-w-2xl mx-auto px-6 py-8 space-y-8">
-              {/* Thank-you screen */}
-              <section>
-                <h2 className="font-display font-semibold text-base mb-4">Thank-you screen</h2>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Title</label>
-                    <input
-                      value={form.settings.thankYouTitle ?? ""}
-                      onChange={(e) => setForm({ ...form, settings: { ...form.settings, thankYouTitle: e.target.value } })}
-                      placeholder="Thank you for your response!"
-                      className="w-full px-4 py-3 rounded-xl border border-input bg-background text-foreground font-display font-semibold text-base focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Message</label>
-                    <textarea
-                      rows={3}
-                      value={form.settings.thankYouMessage ?? ""}
-                      onChange={(e) => setForm({ ...form, settings: { ...form.settings, thankYouMessage: e.target.value } })}
-                      placeholder="Your response has been recorded."
-                      className="w-full px-4 py-3 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none"
-                    />
-                  </div>
-                </div>
-              </section>
+          {/* ── Center: Question editor ── */}
+          <main className="flex-1 overflow-y-auto bg-background">
+            {/* Tab strip */}
+            <div className="border-b border-border px-6 flex gap-1 bg-card">
+              {(["editor", "settings"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActivePanel(tab)}
+                  className={`px-4 py-3 text-sm font-semibold capitalize border-b-2 transition-colors -mb-px ${
+                    activePanel === tab
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {tab === "editor" ? "Questions" : "Settings"}
+                </button>
+              ))}
+            </div>
 
-              {/* Redirect */}
-              <section className="border-t border-border pt-8">
-                <h2 className="font-display font-semibold text-base mb-1">Redirect after submit</h2>
-                <p className="text-xs text-muted-foreground mb-4">Send respondents to a custom URL instead of the thank-you screen.</p>
-                <input
-                  value={form.settings.redirectUrl ?? ""}
-                  onChange={(e) => setForm({ ...form, settings: { ...form.settings, redirectUrl: e.target.value } })}
-                  placeholder="https://yoursite.com/thanks"
-                  className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                />
-              </section>
+            {/* Questions editor */}
+            {activePanel === "editor" && (
+              <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
+                {/* AI Suggestion Panel — shown below tab strip in editor */}
+                {showAiPanel && (
+                  <AISuggestionPanel
+                    suggestions={aiSuggestions}
+                    loading={aiLoading}
+                    error={aiError}
+                    onAdd={addSuggestedQuestion}
+                    onAddAll={addAllSuggestions}
+                    onDismiss={() => setAiDismissed(true)}
+                  />
+                )}
 
-              {/* Branding */}
-              <section className="border-t border-border pt-8">
-                <h2 className="font-display font-semibold text-base mb-1">Formqo branding</h2>
-                <p className="text-xs text-muted-foreground mb-4">Show "Powered by Formqo" at the bottom of your form. Required on the Free plan.</p>
-                <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-muted/20">
-                  <div>
-                    <p className="text-sm font-medium">Show Formqo badge</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Remove branding on Pro plan</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">Pro feature</span>
-                    <div
-                      onClick={() => setForm({ ...form, settings: { ...form.settings, showBranding: !form.settings.showBranding } })}
-                      className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${form.settings.showBranding ? "bg-primary" : "bg-border"}`}
-                    >
-                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${form.settings.showBranding ? "translate-x-4" : "translate-x-0.5"}`} />
+                {activeQuestion ? (
+                  <QuestionEditor
+                    question={activeQuestion}
+                    index={activeIdx}
+                    onChange={(q) => updateQuestion(activeIdx, q)}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-20 text-center px-8">
+                    <div className="w-16 h-16 rounded-2xl bg-primary/8 flex items-center justify-center mb-5">
+                      <Plus size={24} className="text-primary" />
+                    </div>
+                    <h2 className="font-display font-bold text-xl text-foreground mb-2">Add your first question</h2>
+                    <p className="text-muted-foreground text-sm mb-2 max-w-xs">
+                      Choose a question type from the sidebar, or let AI suggest questions based on your form title.
+                    </p>
+                    {!aiLoading && aiSuggestions.length === 0 && form.title.trim().length >= 5 && (
+                      <button
+                        onClick={() => fetchSuggestions(form.title)}
+                        className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 font-medium mb-6 transition-colors"
+                      >
+                        <Sparkles size={12} /> Suggest questions with AI
+                      </button>
+                    )}
+                    <div className="grid grid-cols-2 gap-2 max-w-sm">
+                      {QUESTION_TYPES.slice(0, 6).map((t) => {
+                        const TIcon = t.icon;
+                        return (
+                          <button
+                            key={t.type}
+                            onClick={() => addQuestion(t.type)}
+                            className="flex items-center gap-2 px-4 py-3 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/3 transition-all text-sm font-medium text-left"
+                          >
+                            <TIcon size={14} className="text-primary" />
+                            {t.label}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* Settings panel */}
+            {activePanel === "settings" && (
+              <div className="max-w-2xl mx-auto px-6 py-8 space-y-8">
+                {/* Thank-you screen */}
+                <section>
+                  <h2 className="font-display font-semibold text-base mb-4">Thank-you screen</h2>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Title</label>
+                      <input
+                        value={form.settings.thankYouTitle ?? ""}
+                        onChange={(e) => setForm({ ...form, settings: { ...form.settings, thankYouTitle: e.target.value } })}
+                        placeholder="Thank you for your response!"
+                        className="w-full px-4 py-3 rounded-xl border border-input bg-background text-foreground font-display font-semibold text-base focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Message</label>
+                      <textarea
+                        rows={3}
+                        value={form.settings.thankYouMessage ?? ""}
+                        onChange={(e) => setForm({ ...form, settings: { ...form.settings, thankYouMessage: e.target.value } })}
+                        placeholder="Your response has been recorded."
+                        className="w-full px-4 py-3 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none"
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                {/* Redirect */}
+                <section className="border-t border-border pt-8">
+                  <h2 className="font-display font-semibold text-base mb-1">Redirect after submit</h2>
+                  <p className="text-xs text-muted-foreground mb-4">Send respondents to a custom URL instead of the thank-you screen.</p>
+                  <input
+                    value={form.settings.redirectUrl ?? ""}
+                    onChange={(e) => setForm({ ...form, settings: { ...form.settings, redirectUrl: e.target.value } })}
+                    placeholder="https://yoursite.com/thanks"
+                    className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  />
+                </section>
+
+                {/* Branding */}
+                <section className="border-t border-border pt-8">
+                  <h2 className="font-display font-semibold text-base mb-1">Formqo branding</h2>
+                  <p className="text-xs text-muted-foreground mb-4">Show "Powered by Formqo" at the bottom of your form. Required on the Free plan.</p>
+                  <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-muted/20">
+                    <div>
+                      <p className="text-sm font-medium">Show Formqo badge</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Remove branding on Pro plan</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">Pro feature</span>
+                      <div
+                        onClick={() => setForm({ ...form, settings: { ...form.settings, showBranding: !form.settings.showBranding } })}
+                        className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${form.settings.showBranding ? "bg-primary" : "bg-border"}`}
+                      >
+                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${form.settings.showBranding ? "translate-x-4" : "translate-x-0.5"}`} />
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Notification email */}
+                <section className="border-t border-border pt-8">
+                  <h2 className="font-display font-semibold text-base mb-1">Notification email</h2>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Get an email each time someone submits. Also configurable in{" "}
+                    <a href="/dashboard/integrations" className="text-primary hover:underline">Integrations</a>.
+                  </p>
+                  <input
+                    type="email"
+                    placeholder="you@company.com"
+                    className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  />
+                </section>
+
+                <div className="border-t border-border pt-6">
+                  <button onClick={handleSave} className="btn-primary text-sm">Save settings</button>
                 </div>
-              </section>
+              </div>
+            )}
+          </main>
 
-              {/* Notification email */}
-              <section className="border-t border-border pt-8">
-                <h2 className="font-display font-semibold text-base mb-1">Notification email</h2>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Get an email each time someone submits. Also configurable in{" "}
-                  <a href="/dashboard/integrations" className="text-primary hover:underline">Integrations</a>.
-                </p>
-                <input
-                  type="email"
-                  placeholder="you@company.com"
-                  className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                />
-              </section>
-
-              <div className="border-t border-border pt-6">
-                <button onClick={handleSave} className="btn-primary text-sm">Save settings</button>
+          {/* ── Right: Live preview ── */}
+          <aside className="w-80 border-l border-border bg-muted/20 flex flex-col shrink-0">
+            {/* Device toggle */}
+            <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-border">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Preview</p>
+              <div className="flex gap-1 bg-muted rounded-lg p-0.5">
+                <button
+                  onClick={() => setPreviewDevice("mobile")}
+                  className={`p-1.5 rounded-md transition-colors ${previewDevice === "mobile" ? "bg-card shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <Smartphone size={13} />
+                </button>
+                <button
+                  onClick={() => setPreviewDevice("desktop")}
+                  className={`p-1.5 rounded-md transition-colors ${previewDevice === "desktop" ? "bg-card shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <Monitor size={13} />
+                </button>
               </div>
             </div>
-          )}
-        </main>
 
-
-        {/* ── Right: Live preview ── */}
-        <aside className="w-80 border-l border-border bg-muted/20 flex flex-col shrink-0">
-          {/* Device toggle */}
-          <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-border">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Preview</p>
-            <div className="flex gap-1 bg-muted rounded-lg p-0.5">
-              <button
-                onClick={() => setPreviewDevice("mobile")}
-                className={`p-1.5 rounded-md transition-colors ${previewDevice === "mobile" ? "bg-card shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-              >
-                <Smartphone size={13} />
-              </button>
-              <button
-                onClick={() => setPreviewDevice("desktop")}
-                className={`p-1.5 rounded-md transition-colors ${previewDevice === "desktop" ? "bg-card shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-              >
-                <Monitor size={13} />
-              </button>
+            <div className="flex-1 overflow-y-auto px-4 py-4 flex items-start justify-center">
+              <LivePreview form={form} activeIdx={activeIdx} device={previewDevice} />
             </div>
-          </div>
 
-          <div className="flex-1 overflow-y-auto px-4 py-4 flex items-start justify-center">
-            <LivePreview form={form} activeIdx={activeIdx} device={previewDevice} />
-          </div>
-
-          {/* Panel switcher */}
-          <div className="border-t border-border px-4 py-3 flex items-center gap-2 text-xs">
-            <button
-              onClick={() => setActivePanel("settings")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors font-medium ${
-                activePanel === "settings" ? "bg-primary/8 text-primary" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Settings size={12} /> Settings
-            </button>
-            <span className="ml-auto text-muted-foreground">
-              {form.questions.length} Q
-            </span>
-          </div>
-        </aside>
+            {/* Panel switcher */}
+            <div className="border-t border-border px-4 py-3 flex items-center gap-2 text-xs">
+              <button
+                onClick={() => setActivePanel("settings")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors font-medium ${
+                  activePanel === "settings" ? "bg-primary/8 text-primary" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Settings size={12} /> Settings
+              </button>
+              <span className="ml-auto text-muted-foreground">
+                {form.questions.length} Q
+              </span>
+            </div>
+          </aside>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
