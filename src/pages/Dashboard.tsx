@@ -2,38 +2,9 @@ import { Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import {
   Plus, BarChart3, Eye, MoreHorizontal, Zap, Users,
-  TrendingUp, FileText, Clock, ChevronRight
+  TrendingUp, FileText, Clock, ChevronRight, Pencil
 } from "lucide-react";
-
-const mockForms = [
-  {
-    id: "1",
-    title: "Customer Satisfaction Survey",
-    responses: 142,
-    views: 389,
-    status: "active",
-    updatedAt: "2 hours ago",
-    completionRate: 76,
-  },
-  {
-    id: "2",
-    title: "Product Feedback Form",
-    responses: 87,
-    views: 210,
-    status: "active",
-    updatedAt: "Yesterday",
-    completionRate: 61,
-  },
-  {
-    id: "3",
-    title: "Job Application — Designer",
-    responses: 34,
-    views: 156,
-    status: "closed",
-    updatedAt: "3 days ago",
-    completionRate: 89,
-  },
-];
+import { mockForms } from "@/data/mockForms";
 
 const stats = [
   { label: "Total responses", value: "263", icon: BarChart3, change: "+12%" },
@@ -54,10 +25,10 @@ const Dashboard = () => {
             <h1 className="font-display font-bold text-2xl text-foreground">My Forms</h1>
             <p className="text-sm text-muted-foreground mt-1">Welcome back — here's what's happening</p>
           </div>
-          <button className="btn-primary flex items-center gap-2 text-sm">
+          <Link to="/builder" className="btn-primary flex items-center gap-2 text-sm">
             <Plus size={16} />
             New form
-          </button>
+          </Link>
         </div>
 
         {/* Stats */}
@@ -97,16 +68,27 @@ const Dashboard = () => {
                     </span>
                   </div>
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1"><Clock size={11} /> {form.updatedAt}</span>
-                    <span>{form.responses} responses</span>
-                    <span>{form.views} views</span>
-                    <span>{form.completionRate}% completion</span>
+                    <span className="flex items-center gap-1"><Clock size={11} /> {form.updatedAt ?? "Recently"}</span>
+                    <span>{form.responses ?? 0} responses</span>
+                    <span>{form.views ?? 0} views</span>
+                    <span>{form.completionRate ?? 0}% completion</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="text-xs px-3 py-1.5 rounded-md border border-border hover:border-primary hover:text-primary transition-colors flex items-center gap-1">
+                  <Link
+                    to={`/builder?id=${form.id}`}
+                    className="text-xs px-3 py-1.5 rounded-md border border-border hover:border-primary hover:text-primary transition-colors flex items-center gap-1"
+                  >
+                    <Pencil size={12} /> Edit
+                  </Link>
+                  <Link
+                    to={`/f/${form.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs px-3 py-1.5 rounded-md border border-border hover:border-primary hover:text-primary transition-colors flex items-center gap-1"
+                  >
                     <Eye size={12} /> Preview
-                  </button>
+                  </Link>
                   <button className="text-xs px-3 py-1.5 rounded-md border border-border hover:border-primary hover:text-primary transition-colors flex items-center gap-1">
                     <BarChart3 size={12} /> Results
                   </button>
