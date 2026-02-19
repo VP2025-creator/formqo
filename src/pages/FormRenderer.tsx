@@ -1,8 +1,28 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowRight, ArrowLeft, ArrowUp, ArrowDown, Check } from "lucide-react";
+import { ArrowRight, ArrowLeft, ArrowUp, ArrowDown, Check, Loader2 } from "lucide-react";
 import { getFormById } from "@/data/mockForms";
 import { Form, Question, FormResponse } from "@/types/form";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+const EDGE_BASE = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1`;
+
+// Fetch a CSRF token before the form is submitted
+async function fetchCsrfToken(formId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${EDGE_BASE}/issue-csrf`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ formId }),
+    });
+    const data = await res.json();
+    return data.token ?? null;
+  } catch {
+    return null;
+  }
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -152,6 +172,7 @@ function QuestionScreen({
   isFirst,
   isLast,
   animKey,
+  isSubmitting = false,
 }: {
   question: Question;
   index: number;
@@ -163,6 +184,7 @@ function QuestionScreen({
   isFirst: boolean;
   isLast: boolean;
   animKey: string;
+  isSubmitting?: boolean;
 }) {
   const hasValue = () => {
     if (!value) return false;
@@ -427,7 +449,7 @@ function NavArrows({
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-type Screen = "welcome" | "questions" | "thankyou";
+type Screen = "welcome" | "questions" | "thankyou" | "error";
 
 const FormRenderer = () => {
   const { formId } = useParams<{ formId: string }>();
@@ -437,18 +459,75 @@ const FormRenderer = () => {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [responses, setResponses] = useState<FormResponse[]>([]);
   const [animKey, setAnimKey] = useState("welcome");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // CSRF token fetched on mount (before first interaction)
+  const csrfTokenRef = useRef<string | null>(null);
+  // Honeypot field value — should always stay empty for real users
+  const [honeypot, setHoneypot] = useState("");
+
+  // Pre-fetch CSRF token as soon as the form loads
+  useEffect(() => {
+    if (formId) {
+      fetchCsrfToken(formId).then((token) => {
+        csrfTokenRef.current = token;
+      });
+    }
+  }, [formId]);
 
   const go = (idx: number) => {
     setCurrentIdx(idx);
     setAnimKey(`q-${idx}-${Date.now()}`);
   };
 
-  const handleNext = () => {
-    if (currentIdx < (form?.questions.length ?? 0) - 1) {
-      go(currentIdx + 1);
-    } else {
+  const handleSubmit = async () => {
+    if (!form || !formId) return;
+    setIsSubmitting(true);
+
+    // Refresh CSRF token if we don't have one
+    let token = csrfTokenRef.current;
+    if (!token) {
+      token = await fetchCsrfToken(formId);
+      csrfTokenRef.current = token;
+    }
+
+    try {
+      const res = await fetch(`${EDGE_BASE}/submit-form`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          formId,
+          answers: responses,
+          csrfToken: token,
+          honeypot, // will be empty for real users
+          referrer: window.location.href,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setErrorMsg(data.error ?? "Submission failed. Please try again.");
+        setIsSubmitting(false);
+        return;
+      }
+
       setScreen("thankyou");
       setAnimKey(`ty-${Date.now()}`);
+    } catch {
+      setErrorMsg("Network error. Please check your connection and try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleNext = () => {
+    if (!form) return;
+    if (currentIdx < form.questions.length - 1) {
+      go(currentIdx + 1);
+    } else {
+      handleSubmit();
     }
   };
 
@@ -461,7 +540,7 @@ const FormRenderer = () => {
     setAnimKey(`q-0-${Date.now()}`);
   };
 
-  // Enter key on welcome/thankyou
+  // Enter key on welcome
   useEffect(() => {
     if (screen !== "questions") {
       const handler = (e: KeyboardEvent) => {
@@ -521,6 +600,18 @@ const FormRenderer = () => {
       className="relative overflow-hidden"
       style={{ background: "hsl(var(--foreground))" }}
     >
+      {/* Honeypot field — hidden from real users, visible to bots */}
+      <input
+        type="text"
+        name="website"
+        value={honeypot}
+        onChange={(e) => setHoneypot(e.target.value)}
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+        style={{ position: "absolute", left: "-9999px", width: "1px", height: "1px", opacity: 0 }}
+      />
+
       {/* Progress bar */}
       {screen === "questions" && (
         <ProgressBar current={currentIdx + 1} total={form.questions.length} />
@@ -536,6 +627,29 @@ const FormRenderer = () => {
             Powered by
             <span className="font-display font-bold text-white/40">Formqo</span>
           </Link>
+        </div>
+      )}
+
+      {/* Submission error overlay */}
+      {errorMsg && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-6">
+          <div className="bg-card rounded-2xl border border-border p-8 max-w-sm w-full text-center shadow-xl">
+            <h2 className="font-display font-bold text-xl text-foreground mb-3">Submission failed</h2>
+            <p className="text-sm text-muted-foreground mb-6">{errorMsg}</p>
+            <button
+              onClick={() => setErrorMsg(null)}
+              className="btn-primary w-full"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Submitting overlay */}
+      {isSubmitting && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
+          <Loader2 size={32} className="text-white animate-spin" />
         </div>
       )}
 
@@ -555,6 +669,7 @@ const FormRenderer = () => {
             isFirst={currentIdx === 0}
             isLast={currentIdx === form.questions.length - 1}
             animKey={animKey}
+            isSubmitting={isSubmitting}
           />
           <NavArrows
             onUp={handlePrev}
@@ -571,3 +686,4 @@ const FormRenderer = () => {
 };
 
 export default FormRenderer;
+
