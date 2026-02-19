@@ -476,6 +476,7 @@ const FormBuilder = () => {
   const [previewDevice, setPreviewDevice] = useState<"mobile" | "desktop">("mobile");
   const [showTypeMenu, setShowTypeMenu] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [activePanel, setActivePanel] = useState<"editor" | "settings">("editor");
   const titleRef = useRef<HTMLInputElement>(null);
 
   const updateQuestion = (idx: number, q: Question) => {
@@ -642,41 +643,144 @@ const FormBuilder = () => {
 
         {/* ── Center: Question editor ── */}
         <main className="flex-1 overflow-y-auto bg-background">
-          {activeQuestion ? (
-            <div className="max-w-2xl mx-auto px-6 py-8">
-              <QuestionEditor
-                question={activeQuestion}
-                index={activeIdx}
-                onChange={(q) => updateQuestion(activeIdx, q)}
-              />
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center px-8">
-              <div className="w-16 h-16 rounded-2xl bg-primary/8 flex items-center justify-center mb-5">
-                <Plus size={24} className="text-primary" />
+          {/* Tab strip */}
+          <div className="border-b border-border px-6 flex gap-1 bg-card">
+            {(["editor", "settings"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActivePanel(tab)}
+                className={`px-4 py-3 text-sm font-semibold capitalize border-b-2 transition-colors -mb-px ${
+                  activePanel === tab
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab === "editor" ? "Questions" : "Settings"}
+              </button>
+            ))}
+          </div>
+
+          {/* Questions editor */}
+          {activePanel === "editor" && (
+            activeQuestion ? (
+              <div className="max-w-2xl mx-auto px-6 py-8">
+                <QuestionEditor
+                  question={activeQuestion}
+                  index={activeIdx}
+                  onChange={(q) => updateQuestion(activeIdx, q)}
+                />
               </div>
-              <h2 className="font-display font-bold text-xl text-foreground mb-2">Add your first question</h2>
-              <p className="text-muted-foreground text-sm mb-6 max-w-xs">
-                Choose a question type from the sidebar to get started building your form.
-              </p>
-              <div className="grid grid-cols-2 gap-2 max-w-sm">
-                {QUESTION_TYPES.slice(0, 6).map((t) => {
-                  const TIcon = t.icon;
-                  return (
-                    <button
-                      key={t.type}
-                      onClick={() => addQuestion(t.type)}
-                      className="flex items-center gap-2 px-4 py-3 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/3 transition-all text-sm font-medium text-left"
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center px-8">
+                <div className="w-16 h-16 rounded-2xl bg-primary/8 flex items-center justify-center mb-5">
+                  <Plus size={24} className="text-primary" />
+                </div>
+                <h2 className="font-display font-bold text-xl text-foreground mb-2">Add your first question</h2>
+                <p className="text-muted-foreground text-sm mb-6 max-w-xs">
+                  Choose a question type from the sidebar to get started.
+                </p>
+                <div className="grid grid-cols-2 gap-2 max-w-sm">
+                  {QUESTION_TYPES.slice(0, 6).map((t) => {
+                    const TIcon = t.icon;
+                    return (
+                      <button
+                        key={t.type}
+                        onClick={() => addQuestion(t.type)}
+                        className="flex items-center gap-2 px-4 py-3 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/3 transition-all text-sm font-medium text-left"
+                      >
+                        <TIcon size={14} className="text-primary" />
+                        {t.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )
+          )}
+
+          {/* Settings panel */}
+          {activePanel === "settings" && (
+            <div className="max-w-2xl mx-auto px-6 py-8 space-y-8">
+              {/* Thank-you screen */}
+              <section>
+                <h2 className="font-display font-semibold text-base mb-4">Thank-you screen</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Title</label>
+                    <input
+                      value={form.settings.thankYouTitle ?? ""}
+                      onChange={(e) => setForm({ ...form, settings: { ...form.settings, thankYouTitle: e.target.value } })}
+                      placeholder="Thank you for your response!"
+                      className="w-full px-4 py-3 rounded-xl border border-input bg-background text-foreground font-display font-semibold text-base focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Message</label>
+                    <textarea
+                      rows={3}
+                      value={form.settings.thankYouMessage ?? ""}
+                      onChange={(e) => setForm({ ...form, settings: { ...form.settings, thankYouMessage: e.target.value } })}
+                      placeholder="Your response has been recorded."
+                      className="w-full px-4 py-3 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* Redirect */}
+              <section className="border-t border-border pt-8">
+                <h2 className="font-display font-semibold text-base mb-1">Redirect after submit</h2>
+                <p className="text-xs text-muted-foreground mb-4">Send respondents to a custom URL instead of the thank-you screen.</p>
+                <input
+                  value={form.settings.redirectUrl ?? ""}
+                  onChange={(e) => setForm({ ...form, settings: { ...form.settings, redirectUrl: e.target.value } })}
+                  placeholder="https://yoursite.com/thanks"
+                  className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                />
+              </section>
+
+              {/* Branding */}
+              <section className="border-t border-border pt-8">
+                <h2 className="font-display font-semibold text-base mb-1">Formqo branding</h2>
+                <p className="text-xs text-muted-foreground mb-4">Show "Powered by Formqo" at the bottom of your form. Required on the Free plan.</p>
+                <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-muted/20">
+                  <div>
+                    <p className="text-sm font-medium">Show Formqo badge</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Remove branding on Pro plan</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">Pro feature</span>
+                    <div
+                      onClick={() => setForm({ ...form, settings: { ...form.settings, showBranding: !form.settings.showBranding } })}
+                      className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${form.settings.showBranding ? "bg-primary" : "bg-border"}`}
                     >
-                      <TIcon size={14} className="text-primary" />
-                      {t.label}
-                    </button>
-                  );
-                })}
+                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${form.settings.showBranding ? "translate-x-4" : "translate-x-0.5"}`} />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Notification email */}
+              <section className="border-t border-border pt-8">
+                <h2 className="font-display font-semibold text-base mb-1">Notification email</h2>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Get an email each time someone submits. Also configurable in{" "}
+                  <a href="/dashboard/integrations" className="text-primary hover:underline">Integrations</a>.
+                </p>
+                <input
+                  type="email"
+                  placeholder="you@company.com"
+                  className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                />
+              </section>
+
+              <div className="border-t border-border pt-6">
+                <button onClick={handleSave} className="btn-primary text-sm">Save settings</button>
               </div>
             </div>
           )}
         </main>
+
 
         {/* ── Right: Live preview ── */}
         <aside className="w-80 border-l border-border bg-muted/20 flex flex-col shrink-0">
@@ -703,12 +807,18 @@ const FormBuilder = () => {
             <LivePreview form={form} activeIdx={activeIdx} device={previewDevice} />
           </div>
 
-          {/* Form stats */}
-          <div className="border-t border-border px-4 py-3 flex items-center justify-between text-xs text-muted-foreground">
-            <span>{form.questions.length} question{form.questions.length !== 1 ? "s" : ""}</span>
-            <span className="flex items-center gap-1">
-              <MoreHorizontal size={12} />
-              Settings
+          {/* Panel switcher */}
+          <div className="border-t border-border px-4 py-3 flex items-center gap-2 text-xs">
+            <button
+              onClick={() => setActivePanel("settings")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors font-medium ${
+                activePanel === "settings" ? "bg-primary/8 text-primary" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Settings size={12} /> Settings
+            </button>
+            <span className="ml-auto text-muted-foreground">
+              {form.questions.length} Q
             </span>
           </div>
         </aside>
