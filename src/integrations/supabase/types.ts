@@ -14,6 +14,35 @@ export type Database = {
   }
   public: {
     Tables: {
+      csrf_tokens: {
+        Row: {
+          created_at: string
+          form_id: string
+          token: string
+          used: boolean
+        }
+        Insert: {
+          created_at?: string
+          form_id: string
+          token: string
+          used?: boolean
+        }
+        Update: {
+          created_at?: string
+          form_id?: string
+          token?: string
+          used?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "csrf_tokens_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       form_responses: {
         Row: {
           answers: Json
@@ -54,9 +83,12 @@ export type Database = {
       }
       forms: {
         Row: {
+          allowed_domains: string[] | null
+          captcha_enabled: boolean
           created_at: string
           description: string | null
           id: string
+          max_responses: number | null
           questions: Json
           settings: Json
           status: string
@@ -65,9 +97,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          allowed_domains?: string[] | null
+          captcha_enabled?: boolean
           created_at?: string
           description?: string | null
           id?: string
+          max_responses?: number | null
           questions?: Json
           settings?: Json
           status?: string
@@ -76,9 +111,12 @@ export type Database = {
           user_id: string
         }
         Update: {
+          allowed_domains?: string[] | null
+          captcha_enabled?: boolean
           created_at?: string
           description?: string | null
           id?: string
+          max_responses?: number | null
           questions?: Json
           settings?: Json
           status?: string
@@ -158,6 +196,35 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      submission_rate_limits: {
+        Row: {
+          form_id: string
+          id: string
+          ip_hash: string
+          submitted_at: string
+        }
+        Insert: {
+          form_id: string
+          id?: string
+          ip_hash: string
+          submitted_at?: string
+        }
+        Update: {
+          form_id?: string
+          id?: string
+          ip_hash?: string
+          submitted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submission_rate_limits_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
