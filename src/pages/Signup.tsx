@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, ArrowRight, Check } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const Signup = () => {
   const [name, setName] = useState("");
@@ -8,29 +10,40 @@ const Signup = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   const passwordStrength = password.length === 0 ? 0 : password.length < 6 ? 1 : password.length < 10 ? 2 : 3;
   const strengthColors = ["", "bg-destructive", "bg-yellow-500", "bg-green-500"];
   const strengthLabels = ["", "Weak", "Fair", "Strong"];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: name },
+        emailRedirectTo: window.location.origin,
+      },
+    });
+    if (error) {
+      toast({ title: "Sign up failed", description: error.message, variant: "destructive" });
       setIsLoading(false);
-      window.location.href = "/dashboard";
-    }, 1200);
+    } else {
+      toast({
+        title: "Account created!",
+        description: "Check your email to verify your account, then sign in.",
+      });
+      navigate("/login");
+    }
   };
 
-  const perks = [
-    "3 forms free, forever",
-    "No credit card required",
-    "Set up in under 2 minutes",
-  ];
+  const perks = ["3 forms free, forever", "No credit card required", "Set up in under 2 minutes"];
 
   return (
     <div className="min-h-screen flex">
-      {/* Left panel */}
       <div className="hidden lg:flex lg:w-1/2 bg-foreground flex-col justify-between p-12">
         <Link to="/" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
@@ -38,11 +51,9 @@ const Signup = () => {
           </div>
           <span className="font-display font-bold text-xl text-primary-foreground">Formqo</span>
         </Link>
-
         <div>
           <h2 className="font-display font-bold text-4xl text-primary-foreground leading-tight mb-8">
-            Build forms that<br />
-            <span className="text-primary">actually convert.</span>
+            Build forms that<br /><span className="text-primary">actually convert.</span>
           </h2>
           <ul className="space-y-4">
             {perks.map((perk) => (
@@ -55,28 +66,21 @@ const Signup = () => {
             ))}
           </ul>
         </div>
-
-        <div className="text-primary-foreground/40 text-xs">
-          Join 12,000+ teams already using Formqo
-        </div>
+        <div className="text-primary-foreground/40 text-xs">Join 12,000+ teams already using Formqo</div>
       </div>
 
-      {/* Right panel */}
       <div className="flex-1 flex flex-col justify-center px-6 py-12 lg:px-16">
         <div className="w-full max-w-md mx-auto">
-          {/* Mobile logo */}
           <Link to="/" className="flex items-center gap-2 mb-10 lg:hidden">
             <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center">
               <span className="text-primary-foreground font-display font-bold text-sm">F</span>
             </div>
             <span className="font-display font-bold text-lg">Formqo</span>
           </Link>
-
           <div className="mb-8">
             <h1 className="font-display font-bold text-3xl text-foreground mb-2">Create your account</h1>
             <p className="text-muted-foreground text-sm">Free forever. No credit card needed.</p>
           </div>
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Full name</label>
@@ -124,17 +128,13 @@ const Signup = () => {
                 <div className="mt-2 space-y-1">
                   <div className="flex gap-1">
                     {[1, 2, 3].map((i) => (
-                      <div
-                        key={i}
-                        className={`h-1 flex-1 rounded-full transition-colors ${i <= passwordStrength ? strengthColors[passwordStrength] : "bg-border"}`}
-                      />
+                      <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i <= passwordStrength ? strengthColors[passwordStrength] : "bg-border"}`} />
                     ))}
                   </div>
                   <p className="text-xs text-muted-foreground">{strengthLabels[passwordStrength]}</p>
                 </div>
               )}
             </div>
-
             <button
               type="submit"
               disabled={isLoading}
@@ -147,31 +147,11 @@ const Signup = () => {
               )}
             </button>
           </form>
-
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center text-xs text-muted-foreground bg-background px-3">or</div>
-          </div>
-
-          <button className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-border bg-background text-sm font-medium text-foreground hover:bg-muted/50 transition-colors">
-            <svg width="18" height="18" viewBox="0 0 24 24">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-            </svg>
-            Continue with Google
-          </button>
-
           <p className="text-center text-xs text-muted-foreground mt-6">
             By signing up you agree to our{" "}
             <a href="#" className="text-primary hover:underline">Terms</a>{" "}
-            and{" "}
-            <a href="#" className="text-primary hover:underline">Privacy Policy</a>.
+            and <a href="#" className="text-primary hover:underline">Privacy Policy</a>.
           </p>
-
           <p className="text-center text-sm text-muted-foreground mt-4">
             Already have an account?{" "}
             <Link to="/login" className="text-primary font-medium hover:underline">Sign in</Link>

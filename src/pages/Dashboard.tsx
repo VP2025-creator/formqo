@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import {
   Plus, BarChart3, Eye, MoreHorizontal, Zap, Users,
-  TrendingUp, FileText, Clock, ChevronRight, Pencil
+  TrendingUp, FileText, Clock, ChevronRight, Pencil, Puzzle
 } from "lucide-react";
 import { mockForms } from "@/data/mockForms";
 
@@ -89,9 +89,12 @@ const Dashboard = () => {
                   >
                     <Eye size={12} /> Preview
                   </Link>
-                  <button className="text-xs px-3 py-1.5 rounded-md border border-border hover:border-primary hover:text-primary transition-colors flex items-center gap-1">
+                  <Link
+                    to={`/forms/${form.id}/responses`}
+                    className="text-xs px-3 py-1.5 rounded-md border border-border hover:border-primary hover:text-primary transition-colors flex items-center gap-1"
+                  >
                     <BarChart3 size={12} /> Results
-                  </button>
+                  </Link>
                   <button className="p-1.5 rounded-md border border-border hover:border-primary hover:text-primary transition-colors">
                     <MoreHorizontal size={14} />
                   </button>
@@ -118,6 +121,23 @@ const Dashboard = () => {
             Upgrade now <ChevronRight size={14} />
           </Link>
         </div>
+
+          {/* Integrations quick link */}
+          <Link
+            to="/dashboard/integrations"
+            className="flex items-center justify-between bg-card rounded-2xl border border-border px-6 py-4 hover:border-primary/30 transition-colors group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center">
+                <Puzzle size={16} className="text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-display font-semibold text-sm">Integrations</p>
+                <p className="text-xs text-muted-foreground">Connect Slack, Zapier, email notifications</p>
+              </div>
+            </div>
+            <ChevronRight size={15} className="text-muted-foreground group-hover:text-primary transition-colors" />
+          </Link>
       </div>
     </div>
   );
