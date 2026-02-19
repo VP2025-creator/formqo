@@ -2,3 +2,9 @@ project_id = "vsznqfhfbqqajgexzzky"
 
 [functions.suggest-questions]
 verify_jwt = false
+
+[functions.submit-form]
+verify_jwt = false
+
+[functions.issue-csrf]
+verify_jwt = false
