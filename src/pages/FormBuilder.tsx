@@ -1,0 +1,720 @@
+import { useState, useRef } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import {
+  Plus, Trash2, GripVertical, ChevronDown, Eye,
+  AlignLeft, AlignJustify, List, Star, Mail, ToggleLeft,
+  Hash, Calendar, ChevronRight, ChevronUp, ArrowLeft,
+  Settings, Share2, Check, X, MoreHorizontal, Smartphone, Monitor
+} from "lucide-react";
+import { Question, QuestionType, Form, QuestionOption } from "@/types/form";
+import { mockForms } from "@/data/mockForms";
+
+// ─── Question type config ────────────────────────────────────────────────────
+
+const QUESTION_TYPES: { type: QuestionType; label: string; icon: React.ElementType; description: string }[] = [
+  { type: "short_text",      label: "Short text",      icon: AlignLeft,    description: "Single line answer" },
+  { type: "long_text",       label: "Long text",       icon: AlignJustify, description: "Multi-line answer" },
+  { type: "multiple_choice", label: "Multiple choice", icon: List,         description: "Select from options" },
+  { type: "rating",          label: "Rating",          icon: Star,         description: "1–5 or 1–10 scale" },
+  { type: "email",           label: "Email",           icon: Mail,         description: "Email address" },
+  { type: "yes_no",          label: "Yes / No",        icon: ToggleLeft,   description: "Boolean choice" },
+  { type: "number",          label: "Number",          icon: Hash,         description: "Numeric input" },
+  { type: "date",            label: "Date",            icon: Calendar,     description: "Date picker" },
+];
+
+const TYPE_ICONS: Record<QuestionType, React.ElementType> = {
+  short_text: AlignLeft,
+  long_text: AlignJustify,
+  multiple_choice: List,
+  rating: Star,
+  email: Mail,
+  yes_no: ToggleLeft,
+  number: Hash,
+  date: Calendar,
+  dropdown: List,
+};
+
+function uid() {
+  return Math.random().toString(36).slice(2, 9);
+}
+
+function defaultQuestion(type: QuestionType): Question {
+  const base: Question = {
+    id: uid(),
+    type,
+    title: "",
+    required: false,
+  };
+  if (type === "multiple_choice" || type === "dropdown") {
+    base.options = [
+      { id: uid(), label: "Option 1" },
+      { id: uid(), label: "Option 2" },
+    ];
+  }
+  if (type === "rating") base.maxRating = 5;
+  if (type === "multiple_choice") base.allowMultiple = false;
+  return base;
+}
+
+// ─── Question Type Picker ────────────────────────────────────────────────────
+
+function TypePicker({ current, onChange }: { current: QuestionType; onChange: (t: QuestionType) => void }) {
+  const [open, setOpen] = useState(false);
+  const currentDef = QUESTION_TYPES.find((t) => t.type === current);
+  const Icon = currentDef ? currentDef.icon : AlignLeft;
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-muted/30 text-sm font-medium hover:border-primary/40 transition-colors w-full"
+      >
+        <Icon size={14} className="text-primary" />
+        <span className="flex-1 text-left">{currentDef?.label}</span>
+        <ChevronDown size={13} className="text-muted-foreground" />
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl shadow-lg z-50 overflow-hidden">
+          {QUESTION_TYPES.map((t) => {
+            const TIcon = t.icon;
+            return (
+              <button
+                key={t.type}
+                onClick={() => { onChange(t.type); setOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/60 transition-colors text-left ${t.type === current ? "bg-primary/5" : ""}`}
+              >
+                <TIcon size={14} className={t.type === current ? "text-primary" : "text-muted-foreground"} />
+                <div>
+                  <p className="text-sm font-medium">{t.label}</p>
+                  <p className="text-xs text-muted-foreground">{t.description}</p>
+                </div>
+                {t.type === current && <Check size={13} className="text-primary ml-auto" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Options Editor (for multiple choice) ───────────────────────────────────
+
+function OptionsEditor({
+  options,
+  onChange,
+}: {
+  options: QuestionOption[];
+  onChange: (o: QuestionOption[]) => void;
+}) {
+  const update = (id: string, label: string) =>
+    onChange(options.map((o) => (o.id === id ? { ...o, label } : o)));
+  const remove = (id: string) => onChange(options.filter((o) => o.id !== id));
+  const add = () => onChange([...options, { id: uid(), label: `Option ${options.length + 1}` }]);
+
+  return (
+    <div className="space-y-2">
+      {options.map((opt, idx) => (
+        <div key={opt.id} className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground w-5 shrink-0 font-medium">
+            {String.fromCharCode(65 + idx)}
+          </span>
+          <input
+            value={opt.label}
+            onChange={(e) => update(opt.id, e.target.value)}
+            className="flex-1 px-3 py-2 text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+          />
+          <button
+            onClick={() => remove(opt.id)}
+            className="text-muted-foreground hover:text-destructive p-1 rounded transition-colors"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      ))}
+      <button
+        onClick={add}
+        className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors mt-1 font-medium"
+      >
+        <Plus size={12} /> Add option
+      </button>
+    </div>
+  );
+}
+
+// ─── Question Editor Panel ───────────────────────────────────────────────────
+
+function QuestionEditor({
+  question,
+  index,
+  onChange,
+}: {
+  question: Question;
+  index: number;
+  onChange: (q: Question) => void;
+}) {
+  const update = (partial: Partial<Question>) => onChange({ ...question, ...partial });
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-xs font-semibold text-muted-foreground">Question {index + 1}</span>
+        <TypePicker
+          current={question.type}
+          onChange={(type) => {
+            const defaults = defaultQuestion(type);
+            update({ type, options: defaults.options, maxRating: defaults.maxRating, allowMultiple: defaults.allowMultiple });
+          }}
+        />
+      </div>
+
+      {/* Title */}
+      <div>
+        <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+          Question title *
+        </label>
+        <input
+          value={question.title}
+          onChange={(e) => update({ title: e.target.value })}
+          placeholder="Type your question..."
+          className="w-full px-4 py-3 rounded-xl border border-input bg-background text-foreground font-display font-semibold text-base focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+        />
+      </div>
+
+      {/* Description */}
+      <div>
+        <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+          Description <span className="font-normal normal-case">(optional)</span>
+        </label>
+        <input
+          value={question.description ?? ""}
+          onChange={(e) => update({ description: e.target.value })}
+          placeholder="Add a helpful description..."
+          className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+        />
+      </div>
+
+      {/* Placeholder */}
+      {["short_text", "long_text", "email", "number"].includes(question.type) && (
+        <div>
+          <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+            Placeholder
+          </label>
+          <input
+            value={question.placeholder ?? ""}
+            onChange={(e) => update({ placeholder: e.target.value })}
+            placeholder="e.g. Type your answer here..."
+            className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+          />
+        </div>
+      )}
+
+      {/* Multiple choice options */}
+      {(question.type === "multiple_choice" || question.type === "dropdown") && question.options && (
+        <div>
+          <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+            Options
+          </label>
+          <OptionsEditor options={question.options} onChange={(opts) => update({ options: opts })} />
+          {question.type === "multiple_choice" && (
+            <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
+              <div
+                onClick={() => update({ allowMultiple: !question.allowMultiple })}
+                className={`w-9 h-5 rounded-full transition-colors relative ${question.allowMultiple ? "bg-primary" : "bg-border"}`}
+              >
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${question.allowMultiple ? "translate-x-4" : "translate-x-0.5"}`} />
+              </div>
+              <span className="text-sm text-foreground">Allow multiple selections</span>
+            </label>
+          )}
+        </div>
+      )}
+
+      {/* Rating max */}
+      {question.type === "rating" && (
+        <div>
+          <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+            Scale (max rating)
+          </label>
+          <div className="flex gap-2">
+            {[3, 5, 7, 10].map((n) => (
+              <button
+                key={n}
+                onClick={() => update({ maxRating: n })}
+                className={`px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${
+                  question.maxRating === n
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border text-muted-foreground hover:border-primary/40"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Required toggle */}
+      <div className="pt-2 border-t border-border">
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <div
+            onClick={() => update({ required: !question.required })}
+            className={`w-9 h-5 rounded-full transition-colors relative ${question.required ? "bg-primary" : "bg-border"}`}
+          >
+            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${question.required ? "translate-x-4" : "translate-x-0.5"}`} />
+          </div>
+          <span className="text-sm font-medium">Required</span>
+        </label>
+      </div>
+    </div>
+  );
+}
+
+// ─── Live Preview ─────────────────────────────────────────────────────────────
+
+function LivePreview({ form, activeIdx, device }: { form: Form; activeIdx: number; device: "mobile" | "desktop" }) {
+  const q = form.questions[activeIdx];
+
+  const containerClasses = device === "mobile"
+    ? "w-[320px] h-[580px] rounded-[2.5rem] border-[6px] border-foreground/80 overflow-hidden shadow-2xl"
+    : "w-full h-[520px] rounded-2xl border border-border overflow-hidden shadow-lg";
+
+  return (
+    <div className={`flex items-center justify-center ${device === "mobile" ? "py-4" : ""}`}>
+      <div className={containerClasses}>
+        <div
+          className="w-full h-full overflow-y-auto flex flex-col"
+          style={{ background: "hsl(var(--foreground))", fontFamily: "'Inter', sans-serif" }}
+        >
+          {/* Progress */}
+          <div className="w-full h-0.5 bg-white/10 shrink-0">
+            <div
+              className="h-full bg-white transition-all"
+              style={{ width: `${((activeIdx + 1) / form.questions.length) * 100}%` }}
+            />
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 p-6 flex flex-col justify-center">
+            {q ? (
+              <>
+                <p className="text-white/40 text-xs mb-4 font-body">
+                  {activeIdx + 1} → {QUESTION_TYPES.find(t => t.type === q.type)?.label}
+                </p>
+                <h3 className="font-display font-bold text-white text-lg leading-tight mb-2">
+                  {q.required && <span className="text-primary">* </span>}
+                  {q.title || <span className="opacity-30 italic font-normal">Untitled question</span>}
+                </h3>
+                {q.description && <p className="text-white/50 text-xs mb-4">{q.description}</p>}
+
+                {/* Preview of input */}
+                {(q.type === "short_text" || q.type === "email" || q.type === "number") && (
+                  <div className="border-b border-white/25 pb-2 text-white/30 text-sm">
+                    {q.placeholder || "Type your answer here..."}
+                  </div>
+                )}
+                {q.type === "long_text" && (
+                  <div className="border border-white/20 rounded-lg p-3 text-white/30 text-xs h-16">
+                    {q.placeholder || "Type your answer here..."}
+                  </div>
+                )}
+                {q.type === "rating" && (
+                  <div className="flex gap-2 mt-2">
+                    {Array.from({ length: q.maxRating ?? 5 }, (_, i) => (
+                      <div key={i} className="w-8 h-8 rounded-lg border border-white/25 flex items-center justify-center text-white/50 text-xs font-bold">
+                        {i + 1}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {(q.type === "multiple_choice") && q.options && (
+                  <div className="space-y-2 mt-2">
+                    {q.options.slice(0, 3).map((opt, i) => (
+                      <div key={opt.id} className="flex items-center gap-2 border border-white/20 rounded-lg px-3 py-2">
+                        <span className="text-white/30 text-xs w-4">{String.fromCharCode(65 + i)}</span>
+                        <span className="text-white/60 text-xs">{opt.label}</span>
+                      </div>
+                    ))}
+                    {q.options.length > 3 && <p className="text-white/25 text-xs pl-1">+{q.options.length - 3} more</p>}
+                  </div>
+                )}
+                {q.type === "yes_no" && (
+                  <div className="flex gap-3 mt-2">
+                    {["Yes", "No"].map((opt) => (
+                      <div key={opt} className="flex items-center gap-2 border border-white/20 rounded-lg px-4 py-2">
+                        <span className="text-white/30 text-xs">{opt === "Yes" ? "Y" : "N"}</span>
+                        <span className="text-white/60 text-sm">{opt}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <button className="mt-6 self-start flex items-center gap-2 bg-white text-foreground px-4 py-2 rounded-lg text-xs font-semibold">
+                  OK <ArrowLeft size={10} className="rotate-180" />
+                </button>
+              </>
+            ) : (
+              <div className="text-center text-white/30">
+                <p className="text-sm">No questions yet</p>
+              </div>
+            )}
+          </div>
+
+          {/* Branding */}
+          <div className="flex justify-center pb-3">
+            <p className="text-white/20 text-[10px]">Powered by <span className="font-bold">Formqo</span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Question List (sidebar) ─────────────────────────────────────────────────
+
+function QuestionListItem({
+  question,
+  index,
+  isActive,
+  onSelect,
+  onMoveUp,
+  onMoveDown,
+  onDelete,
+  canMoveUp,
+  canMoveDown,
+}: {
+  question: Question;
+  index: number;
+  isActive: boolean;
+  onSelect: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onDelete: () => void;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+}) {
+  const Icon = TYPE_ICONS[question.type] ?? AlignLeft;
+
+  return (
+    <div
+      onClick={onSelect}
+      className={`group flex items-start gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all border ${
+        isActive
+          ? "bg-primary/5 border-primary/30"
+          : "border-transparent hover:bg-muted/60"
+      }`}
+    >
+      <GripVertical size={14} className="text-muted-foreground/40 mt-0.5 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-0.5">
+          <Icon size={12} className={isActive ? "text-primary" : "text-muted-foreground"} />
+          <span className={`text-xs font-semibold ${isActive ? "text-primary" : "text-muted-foreground"}`}>
+            {index + 1}
+          </span>
+          {question.required && <span className="text-primary text-xs">*</span>}
+        </div>
+        <p className="text-sm font-medium text-foreground truncate">
+          {question.title || <span className="text-muted-foreground italic font-normal">Untitled</span>}
+        </p>
+      </div>
+      <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        <button
+          onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
+          disabled={!canMoveUp}
+          className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
+        >
+          <ChevronUp size={12} />
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
+          disabled={!canMoveDown}
+          className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
+        >
+          <ChevronDown size={12} />
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="p-0.5 text-muted-foreground hover:text-destructive transition-colors"
+        >
+          <Trash2 size={12} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main FormBuilder ─────────────────────────────────────────────────────────
+
+const FormBuilder = () => {
+  const [searchParams] = useSearchParams();
+  const formId = searchParams.get("id");
+
+  // Initialise from mock if id provided, else blank
+  const initial: Form = formId
+    ? (mockForms.find((f) => f.id === formId) ?? {
+        id: uid(),
+        title: "Untitled form",
+        questions: [],
+        settings: { primaryColor: "hsl(357 95% 22%)", showBranding: true },
+        status: "draft",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+    : {
+        id: uid(),
+        title: "Untitled form",
+        questions: [],
+        settings: { primaryColor: "hsl(357 95% 22%)", showBranding: true },
+        status: "draft",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+  const [form, setForm] = useState<Form>(initial);
+  const [activeIdx, setActiveIdx] = useState<number>(0);
+  const [previewDevice, setPreviewDevice] = useState<"mobile" | "desktop">("mobile");
+  const [showTypeMenu, setShowTypeMenu] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const titleRef = useRef<HTMLInputElement>(null);
+
+  const updateQuestion = (idx: number, q: Question) => {
+    const qs = [...form.questions];
+    qs[idx] = q;
+    setForm({ ...form, questions: qs });
+  };
+
+  const addQuestion = (type: QuestionType) => {
+    const q = defaultQuestion(type);
+    const qs = [...form.questions, q];
+    setForm({ ...form, questions: qs });
+    setActiveIdx(qs.length - 1);
+    setShowTypeMenu(false);
+  };
+
+  const deleteQuestion = (idx: number) => {
+    const qs = form.questions.filter((_, i) => i !== idx);
+    setForm({ ...form, questions: qs });
+    setActiveIdx(Math.max(0, idx - 1));
+  };
+
+  const moveQuestion = (from: number, to: number) => {
+    const qs = [...form.questions];
+    const [removed] = qs.splice(from, 1);
+    qs.splice(to, 0, removed);
+    setForm({ ...form, questions: qs });
+    setActiveIdx(to);
+  };
+
+  const handleSave = () => {
+    // Placeholder for backend save
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const activeQuestion = form.questions[activeIdx];
+
+  return (
+    <div className="h-screen flex flex-col bg-background overflow-hidden">
+      {/* ── Top bar ── */}
+      <header className="h-14 border-b border-border bg-card flex items-center px-4 gap-4 shrink-0 z-40">
+        <Link
+          to="/dashboard"
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
+        >
+          <ArrowLeft size={15} />
+          <span className="hidden sm:inline">Dashboard</span>
+        </Link>
+
+        <div className="w-px h-5 bg-border shrink-0" />
+
+        {/* Editable title */}
+        <input
+          ref={titleRef}
+          value={form.title}
+          onChange={(e) => setForm({ ...form, title: e.target.value })}
+          className="font-display font-semibold text-sm bg-transparent border-none outline-none focus:ring-2 focus:ring-primary/20 focus:bg-muted/30 px-2 py-1 rounded-lg transition-all flex-1 min-w-0 max-w-xs"
+          placeholder="Untitled form"
+        />
+
+        <div className="ml-auto flex items-center gap-2">
+          {/* Status badge */}
+          <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+            form.status === "active" ? "bg-green-50 text-green-700" :
+            form.status === "closed" ? "bg-muted text-muted-foreground" :
+            "bg-amber-50 text-amber-700"
+          }`}>
+            {form.status}
+          </span>
+
+          <a
+            href={`/f/${form.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-outline flex items-center gap-1.5 text-xs py-2 px-3"
+          >
+            <Eye size={13} /> Preview
+          </a>
+
+          <button
+            onClick={handleSave}
+            className={`flex items-center gap-1.5 text-xs py-2 px-4 rounded-lg font-semibold transition-all ${
+              saved
+                ? "bg-green-600 text-white"
+                : "btn-primary"
+            }`}
+          >
+            {saved ? <><Check size={13} /> Saved</> : "Save"}
+          </button>
+
+          <button className="btn-primary flex items-center gap-1.5 text-xs py-2 px-4">
+            <Share2 size={13} /> Publish
+          </button>
+        </div>
+      </header>
+
+      {/* ── Body ── */}
+      <div className="flex-1 flex overflow-hidden">
+
+        {/* ── Left: Question list ── */}
+        <aside className="w-64 border-r border-border bg-card flex flex-col shrink-0 overflow-hidden">
+          <div className="px-3 pt-3 pb-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1 mb-2">
+              Questions
+            </p>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-2 space-y-1">
+            {form.questions.length === 0 && (
+              <div className="text-center py-10 px-4">
+                <p className="text-muted-foreground text-sm mb-1">No questions yet</p>
+                <p className="text-muted-foreground text-xs">Add your first question below</p>
+              </div>
+            )}
+            {form.questions.map((q, idx) => (
+              <QuestionListItem
+                key={q.id}
+                question={q}
+                index={idx}
+                isActive={idx === activeIdx}
+                onSelect={() => setActiveIdx(idx)}
+                onMoveUp={() => moveQuestion(idx, idx - 1)}
+                onMoveDown={() => moveQuestion(idx, idx + 1)}
+                onDelete={() => deleteQuestion(idx)}
+                canMoveUp={idx > 0}
+                canMoveDown={idx < form.questions.length - 1}
+              />
+            ))}
+          </div>
+
+          {/* Add question button */}
+          <div className="p-3 border-t border-border relative">
+            <button
+              onClick={() => setShowTypeMenu(!showTypeMenu)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/3 text-muted-foreground hover:text-primary text-sm font-medium transition-all"
+            >
+              <Plus size={15} />
+              Add question
+            </button>
+
+            {showTypeMenu && (
+              <div className="absolute bottom-full left-2 right-2 mb-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden z-50 max-h-80 overflow-y-auto">
+                {QUESTION_TYPES.map((t) => {
+                  const TIcon = t.icon;
+                  return (
+                    <button
+                      key={t.type}
+                      onClick={() => addQuestion(t.type)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/60 transition-colors text-left"
+                    >
+                      <TIcon size={14} className="text-primary shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium">{t.label}</p>
+                        <p className="text-xs text-muted-foreground">{t.description}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {/* ── Center: Question editor ── */}
+        <main className="flex-1 overflow-y-auto bg-background">
+          {activeQuestion ? (
+            <div className="max-w-2xl mx-auto px-6 py-8">
+              <QuestionEditor
+                question={activeQuestion}
+                index={activeIdx}
+                onChange={(q) => updateQuestion(activeIdx, q)}
+              />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-center px-8">
+              <div className="w-16 h-16 rounded-2xl bg-primary/8 flex items-center justify-center mb-5">
+                <Plus size={24} className="text-primary" />
+              </div>
+              <h2 className="font-display font-bold text-xl text-foreground mb-2">Add your first question</h2>
+              <p className="text-muted-foreground text-sm mb-6 max-w-xs">
+                Choose a question type from the sidebar to get started building your form.
+              </p>
+              <div className="grid grid-cols-2 gap-2 max-w-sm">
+                {QUESTION_TYPES.slice(0, 6).map((t) => {
+                  const TIcon = t.icon;
+                  return (
+                    <button
+                      key={t.type}
+                      onClick={() => addQuestion(t.type)}
+                      className="flex items-center gap-2 px-4 py-3 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/3 transition-all text-sm font-medium text-left"
+                    >
+                      <TIcon size={14} className="text-primary" />
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </main>
+
+        {/* ── Right: Live preview ── */}
+        <aside className="w-80 border-l border-border bg-muted/20 flex flex-col shrink-0">
+          {/* Device toggle */}
+          <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-border">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Preview</p>
+            <div className="flex gap-1 bg-muted rounded-lg p-0.5">
+              <button
+                onClick={() => setPreviewDevice("mobile")}
+                className={`p-1.5 rounded-md transition-colors ${previewDevice === "mobile" ? "bg-card shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Smartphone size={13} />
+              </button>
+              <button
+                onClick={() => setPreviewDevice("desktop")}
+                className={`p-1.5 rounded-md transition-colors ${previewDevice === "desktop" ? "bg-card shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Monitor size={13} />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 py-4 flex items-start justify-center">
+            <LivePreview form={form} activeIdx={activeIdx} device={previewDevice} />
+          </div>
+
+          {/* Form stats */}
+          <div className="border-t border-border px-4 py-3 flex items-center justify-between text-xs text-muted-foreground">
+            <span>{form.questions.length} question{form.questions.length !== 1 ? "s" : ""}</span>
+            <span className="flex items-center gap-1">
+              <MoreHorizontal size={12} />
+              Settings
+            </span>
+          </div>
+        </aside>
+      </div>
+    </div>
+  );
+};
+
+export default FormBuilder;
