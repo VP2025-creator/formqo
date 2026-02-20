@@ -1,10 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { ArrowRight, ArrowLeft, ArrowUp, ArrowDown, Check, Loader2 } from "lucide-react";
-import { getFormById } from "@/data/mockForms";
 import { Form, Question, FormResponse } from "@/types/form";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 const EDGE_BASE = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1`;
@@ -321,15 +319,16 @@ function QuestionScreen({
       <div className="flex items-center gap-3">
         <button
           onClick={onNext}
-          disabled={!canProceed}
+          disabled={!canProceed || isSubmitting}
           className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200 font-display ${
             canProceed
               ? "bg-white text-foreground hover:bg-white/90 hover:scale-105"
               : "bg-white/10 text-white/30 cursor-not-allowed"
           }`}
         >
+          {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : null}
           {isLast ? "Submit" : "OK"}
-          <ArrowRight size={15} />
+          {!isSubmitting && <ArrowRight size={15} />}
         </button>
         {question.type !== "long_text" && canProceed && (
           <span className="text-white/30 text-xs font-body hidden sm:block">
@@ -355,9 +354,14 @@ function QuestionScreen({
 
 // ─── Welcome Screen ──────────────────────────────────────────────────────────
 
-function WelcomeScreen({ form, onStart }: { form: Form; onStart: () => void }) {
+function WelcomeScreen({ form, onStart, isPreview }: { form: Form; onStart: () => void; isPreview: boolean }) {
   return (
     <div className="animate-fade-up min-h-screen flex flex-col justify-center px-8 md:px-16 lg:px-24">
+      {isPreview && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 bg-amber-500/90 text-white text-xs font-semibold px-4 py-1.5 rounded-full shadow-lg">
+          Preview mode — responses won't be saved
+        </div>
+      )}
       <div className="max-w-2xl">
         <p className="text-white/40 text-sm font-body uppercase tracking-widest mb-6">
           {form.questions.length} questions · ~2 min
@@ -449,11 +453,16 @@ function NavArrows({
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-type Screen = "welcome" | "questions" | "thankyou" | "error";
+type Screen = "welcome" | "questions" | "thankyou";
 
 const FormRenderer = () => {
   const { formId } = useParams<{ formId: string }>();
-  const form = getFormById(formId ?? "");
+  const [searchParams] = useSearchParams();
+  const isPreview = searchParams.get("preview") === "1";
+
+  const [form, setForm] = useState<Form | null>(null);
+  const [formLoading, setFormLoading] = useState(true);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const [screen, setScreen] = useState<Screen>("welcome");
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -462,19 +471,60 @@ const FormRenderer = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // CSRF token fetched on mount (before first interaction)
   const csrfTokenRef = useRef<string | null>(null);
-  // Honeypot field value — should always stay empty for real users
   const [honeypot, setHoneypot] = useState("");
 
-  // Pre-fetch CSRF token as soon as the form loads
+  // Load form from DB
   useEffect(() => {
-    if (formId) {
+    if (!formId) return;
+    const load = async () => {
+      setFormLoading(true);
+      const { data, error } = await supabase
+        .from("forms")
+        .select("*")
+        .eq("id", formId)
+        .single();
+
+      if (error || !data) {
+        setFormError("not_found");
+        setFormLoading(false);
+        return;
+      }
+
+      // If not preview mode, only allow active forms
+      if (!isPreview && data.status !== "active") {
+        setFormError(data.status === "closed" ? "closed" : "inactive");
+        setFormLoading(false);
+        return;
+      }
+
+      const mapped: Form = {
+        id: data.id,
+        title: data.title,
+        description: data.description ?? undefined,
+        questions: (data.questions as unknown as Question[]) ?? [],
+        settings: (data.settings as unknown as Form["settings"]) ?? {
+          primaryColor: "hsl(357 95% 22%)",
+          showBranding: true,
+        },
+        status: data.status as Form["status"],
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      };
+      setForm(mapped);
+      setFormLoading(false);
+    };
+    load();
+  }, [formId, isPreview]);
+
+  // Pre-fetch CSRF token
+  useEffect(() => {
+    if (formId && !isPreview) {
       fetchCsrfToken(formId).then((token) => {
         csrfTokenRef.current = token;
       });
     }
-  }, [formId]);
+  }, [formId, isPreview]);
 
   const go = (idx: number) => {
     setCurrentIdx(idx);
@@ -483,9 +533,16 @@ const FormRenderer = () => {
 
   const handleSubmit = async () => {
     if (!form || !formId) return;
+
+    // In preview mode, just show thank-you without saving
+    if (isPreview) {
+      setScreen("thankyou");
+      setAnimKey(`ty-${Date.now()}`);
+      return;
+    }
+
     setIsSubmitting(true);
 
-    // Refresh CSRF token if we don't have one
     let token = csrfTokenRef.current;
     if (!token) {
       token = await fetchCsrfToken(formId);
@@ -500,7 +557,7 @@ const FormRenderer = () => {
           formId,
           answers: responses,
           csrfToken: token,
-          honeypot, // will be empty for real users
+          honeypot,
           referrer: window.location.href,
         }),
       });
@@ -549,6 +606,7 @@ const FormRenderer = () => {
       window.addEventListener("keydown", handler);
       return () => window.removeEventListener("keydown", handler);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen]);
 
   const setResponse = (r: FormResponse) => {
@@ -563,30 +621,35 @@ const FormRenderer = () => {
     });
   };
 
-  if (!form) {
+  // Loading state
+  if (formLoading) {
     return (
-      <div className="min-h-screen bg-charcoal flex items-center justify-center text-white">
-        <div className="text-center">
-          <h1 className="font-display text-3xl font-bold mb-3">Form not found</h1>
-          <p className="text-white/50 mb-6">This form may have been closed or doesn't exist.</p>
-          <Link to="/" className="btn-primary">Back to Formqo</Link>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "hsl(var(--foreground))" }}>
+        <Loader2 size={28} className="text-white/40 animate-spin" />
+      </div>
+    );
+  }
+
+  // Error states
+  if (formError === "closed") {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "hsl(var(--foreground))" }}>
+        <div className="text-center px-8">
+          <h1 className="font-display text-3xl font-bold mb-3 text-white">This form is closed</h1>
+          <p className="text-white/50 mb-6">The creator has stopped accepting responses.</p>
+          <Link to="/" className="inline-flex items-center gap-2 text-white/40 hover:text-white text-sm transition-colors">← Back to Formqo</Link>
         </div>
       </div>
     );
   }
 
-  if (form.status === "closed") {
+  if (formError || !form) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ background: "hsl(var(--foreground))" }}
-      >
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "hsl(var(--foreground))" }}>
         <div className="text-center px-8">
-          <h1 className="font-display text-3xl font-bold mb-3 text-white">This form is closed</h1>
-          <p className="text-white/50 mb-6">The creator has stopped accepting responses.</p>
-          <Link to="/" className="inline-flex items-center gap-2 text-white/40 hover:text-white text-sm transition-colors">
-            ← Back to Formqo
-          </Link>
+          <h1 className="font-display text-3xl font-bold mb-3 text-white">Form not found</h1>
+          <p className="text-white/50 mb-6">This form may have been closed or doesn't exist.</p>
+          <Link to="/" className="btn-primary">Back to Formqo</Link>
         </div>
       </div>
     );
@@ -600,7 +663,7 @@ const FormRenderer = () => {
       className="relative overflow-hidden"
       style={{ background: "hsl(var(--foreground))" }}
     >
-      {/* Honeypot field — hidden from real users, visible to bots */}
+      {/* Honeypot field */}
       <input
         type="text"
         name="website"
@@ -636,12 +699,7 @@ const FormRenderer = () => {
           <div className="bg-card rounded-2xl border border-border p-8 max-w-sm w-full text-center shadow-xl">
             <h2 className="font-display font-bold text-xl text-foreground mb-3">Submission failed</h2>
             <p className="text-sm text-muted-foreground mb-6">{errorMsg}</p>
-            <button
-              onClick={() => setErrorMsg(null)}
-              className="btn-primary w-full"
-            >
-              Try again
-            </button>
+            <button onClick={() => setErrorMsg(null)} className="btn-primary w-full">Try again</button>
           </div>
         </div>
       )}
@@ -653,7 +711,7 @@ const FormRenderer = () => {
         </div>
       )}
 
-      {screen === "welcome" && <WelcomeScreen form={form} onStart={handleStart} />}
+      {screen === "welcome" && <WelcomeScreen form={form} onStart={handleStart} isPreview={isPreview} />}
 
       {screen === "questions" && currentQuestion && (
         <>
@@ -686,4 +744,3 @@ const FormRenderer = () => {
 };
 
 export default FormRenderer;
-
