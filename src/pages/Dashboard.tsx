@@ -6,14 +6,16 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Plus, BarChart3, Eye, MoreHorizontal, Zap, Users,
   TrendingUp, FileText, Clock, ChevronRight, Pencil, Puzzle,
-  ArrowRight, Loader2, Trash2,
+  ArrowRight, Loader2, Trash2, Link2,
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
 interface Form {
@@ -63,6 +65,27 @@ const Dashboard = () => {
     loadData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  const handleToggleStatus = async (formId: string, currentStatus: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const newStatus = currentStatus === "active" ? "draft" : "active";
+    const { error } = await supabase.from("forms").update({ status: newStatus }).eq("id", formId);
+    if (error) {
+      toast.error("Failed to update status");
+    } else {
+      setForms((prev) => prev.map((f) => f.id === formId ? { ...f, status: newStatus } : f));
+      toast.success(newStatus === "active" ? "Form is now live ✓" : "Form deactivated");
+    }
+  };
+
+  const handleCopyLink = (formId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const url = `${window.location.origin}/f/${formId}?preview=1`;
+    navigator.clipboard.writeText(url);
+    toast.success("Preview link copied!");
+  };
 
   const handleDeleteForm = async (formId: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -206,6 +229,18 @@ const Dashboard = () => {
                         </div>
                       </div>
 
+                      {/* Status toggle */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Switch
+                          checked={form.status === "active"}
+                          onCheckedChange={() => {
+                            const fakeEvent = { preventDefault: () => {}, stopPropagation: () => {} } as unknown as React.MouseEvent;
+                            handleToggleStatus(form.id, form.status, fakeEvent);
+                          }}
+                          aria-label="Toggle form status"
+                        />
+                      </div>
+
                       {/* Desktop action buttons */}
                       <div className="hidden md:flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Link
@@ -215,7 +250,7 @@ const Dashboard = () => {
                           <Pencil size={12} /> Edit
                         </Link>
                         <Link
-                          to={`/f/${form.id}`}
+                          to={`/f/${form.id}?preview=1`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-xs px-3 py-1.5 rounded-md border border-border hover:border-primary hover:text-primary transition-colors flex items-center gap-1"
@@ -237,22 +272,29 @@ const Dashboard = () => {
                             <MoreHorizontal size={14} />
                           </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuContent align="end" className="w-48">
                           <DropdownMenuItem asChild>
                             <Link to={`/builder?id=${form.id}`} className="flex items-center gap-2">
                               <Pencil size={13} /> Edit
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
-                            <Link to={`/f/${form.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                            <Link to={`/f/${form.id}?preview=1`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
                               <Eye size={13} /> Preview
                             </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="flex items-center gap-2"
+                            onClick={(e) => handleCopyLink(form.id, e as unknown as React.MouseEvent)}
+                          >
+                            <Link2 size={13} /> Copy link
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
                             <Link to={`/forms/${form.id}/responses`} className="flex items-center gap-2">
                               <BarChart3 size={13} /> Results
                             </Link>
                           </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive flex items-center gap-2"
                             onClick={(e) => handleDeleteForm(form.id, e as unknown as React.MouseEvent)}
