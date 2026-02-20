@@ -13,6 +13,7 @@ import FormRenderer from "./pages/FormRenderer";
 import FormBuilder from "./pages/FormBuilder";
 import FormResponses from "./pages/FormResponses";
 import Integrations from "./pages/Integrations";
+import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/f/:formId" element={<FormRenderer />} />
             <Route path="/forms/:formId/responses" element={<FormResponses />} />
             <Route path="/dashboard/integrations" element={<Integrations />} />
+            <Route path="/pricing" element={<Pricing />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

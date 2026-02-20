@@ -53,7 +53,7 @@ const Navbar = ({ variant = "default", userRole }: NavbarProps) => {
         <div className="hidden md:flex items-center gap-8">
           <a href="#features" className="nav-link">Features</a>
           <a href="#integrations" className="nav-link">Integrations</a>
-          <a href="#pricing" className="nav-link">Pricing</a>
+          <Link to="/pricing" className="nav-link">Pricing</Link>
           <Link to="/login" className="nav-link">Log in</Link>
           <Link
             to="/signup"
@@ -77,7 +77,7 @@ const Navbar = ({ variant = "default", userRole }: NavbarProps) => {
         <div className="md:hidden border-t border-border bg-background px-4 py-6 flex flex-col gap-4">
           <a href="#features" className="nav-link text-base" onClick={() => setMobileOpen(false)}>Features</a>
           <a href="#integrations" className="nav-link text-base" onClick={() => setMobileOpen(false)}>Integrations</a>
-          <a href="#pricing" className="nav-link text-base" onClick={() => setMobileOpen(false)}>Pricing</a>
+          <Link to="/pricing" className="nav-link text-base" onClick={() => setMobileOpen(false)}>Pricing</Link>
           <Link to="/login" className="nav-link text-base" onClick={() => setMobileOpen(false)}>Log in</Link>
           <Link
             to="/signup"
