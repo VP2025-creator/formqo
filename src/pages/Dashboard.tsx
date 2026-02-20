@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
@@ -6,8 +6,9 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Plus, BarChart3, Eye, MoreHorizontal, Zap, Users,
   TrendingUp, FileText, Clock, ChevronRight, Pencil, Puzzle,
-  ArrowRight, Loader2, Trash2, Link2, Copy,
+  ArrowRight, Loader2, Trash2, Link2, Copy, Search, X,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,6 +41,8 @@ const Dashboard = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [totalResponses, setTotalResponses] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "draft" | "closed">("all");
 
   const loadData = async () => {
     if (!user) return;
@@ -129,6 +132,14 @@ const Dashboard = () => {
   const isAdmin = profile?.plan === "admin";
   const isFree = !isAdmin && (profile?.plan === "free" || !profile?.plan);
 
+  const filteredForms = useMemo(() => {
+    return forms.filter((f) => {
+      const matchesSearch = f.title.toLowerCase().includes(search.toLowerCase());
+      const matchesStatus = statusFilter === "all" || f.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [forms, search, statusFilter]);
+
   const formCount = forms.length;
   const showUpgradeNudge = isFree && (formCount >= 2 || totalResponses >= 80);
   const nudgeReason =
@@ -215,11 +226,55 @@ const Dashboard = () => {
 
             {/* Forms list */}
             <div className="bg-card rounded-2xl border border-border overflow-hidden mb-6">
-              <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-border">
-                <h2 className="font-display font-semibold text-sm">Your forms</h2>
-                <span className="text-xs text-muted-foreground">
-                  {formCount} form{formCount !== 1 ? "s" : ""} {isFree ? `· free plan (max 3)` : ""}
-                </span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 md:px-6 py-4 border-b border-border">
+                <h2 className="font-display font-semibold text-sm shrink-0">Your forms</h2>
+                <div className="flex items-center gap-2 flex-1 sm:justify-end">
+                  {/* Search */}
+                  <div className="relative flex-1 sm:max-w-[200px]">
+                    <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    <Input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search forms…"
+                      className="pl-7 pr-7 h-8 text-xs"
+                    />
+                    {search && (
+                      <button
+                        onClick={() => setSearch("")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                  {/* Status filter */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {(["all", "active", "draft", "closed"] as const).map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setStatusFilter(s)}
+                        className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
+                          statusFilter === s
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {s.charAt(0).toUpperCase() + s.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {(search || statusFilter !== "all") && forms.length > 0 && (
+                  <p className="text-xs text-muted-foreground px-4 md:px-6 pb-2">
+                    Showing {filteredForms.length} of {formCount} form{formCount !== 1 ? "s" : ""}
+                    {isFree ? ` · free plan (max 3)` : ""}
+                  </p>
+                )}
+                {!search && statusFilter === "all" && (
+                  <p className="text-xs text-muted-foreground px-4 md:px-6 pb-2">
+                    {formCount} form{formCount !== 1 ? "s" : ""} {isFree ? `· free plan (max 3)` : ""}
+                  </p>
+                )}
               </div>
               {forms.length === 0 ? (
                 <div className="px-6 py-12 text-center">
@@ -229,9 +284,20 @@ const Dashboard = () => {
                     <Plus size={14} /> Create form
                   </Link>
                 </div>
+              ) : filteredForms.length === 0 ? (
+                <div className="px-6 py-10 text-center">
+                  <Search size={28} className="text-muted-foreground/40 mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">No forms match your search.</p>
+                  <button
+                    onClick={() => { setSearch(""); setStatusFilter("all"); }}
+                    className="text-xs text-primary mt-2 hover:underline"
+                  >
+                    Clear filters
+                  </button>
+                </div>
               ) : (
                 <div className="divide-y divide-border">
-                  {forms.map((form) => (
+                  {filteredForms.map((form) => (
                     <div key={form.id} className="flex items-center gap-3 px-4 md:px-6 py-3 md:py-4 hover:bg-muted/30 transition-colors group">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
