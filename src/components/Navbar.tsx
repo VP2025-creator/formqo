@@ -1,6 +1,7 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface NavbarProps {
   variant?: "default" | "dashboard";
@@ -10,6 +11,13 @@ interface NavbarProps {
 const Navbar = ({ variant = "default", userRole }: NavbarProps) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -28,12 +36,15 @@ const Navbar = ({ variant = "default", userRole }: NavbarProps) => {
           <Link to="/dashboard" className={`text-sm font-medium transition-colors ${isActive("/dashboard") ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
             Dashboard
           </Link>
-          <Link
-            to="/"
+          <Link to="/settings" className={`text-sm font-medium transition-colors ${isActive("/settings") ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+            Settings
+          </Link>
+          <button
+            onClick={handleSignOut}
             className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
           >
             Sign out
-          </Link>
+          </button>
         </div>
       </nav>
     );
