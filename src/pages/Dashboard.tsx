@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Plus, BarChart3, Eye, MoreHorizontal, Zap, Users,
   TrendingUp, FileText, Clock, ChevronRight, Pencil, Puzzle,
-  ArrowRight, Loader2, Trash2, Link2,
+  ArrowRight, Loader2, Trash2, Link2, Copy,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -24,6 +24,9 @@ interface Form {
   status: string;
   updated_at: string;
   questions: unknown;
+  settings: unknown;
+  description: string | null;
+  responseCount?: number;
 }
 
 interface Profile {
@@ -42,19 +45,27 @@ const Dashboard = () => {
     if (!user) return;
     const [profileRes, formsRes] = await Promise.all([
       supabase.from("profiles").select("full_name, plan").eq("id", user.id).single(),
-      supabase.from("forms").select("id, title, status, updated_at, questions").eq("user_id", user.id).order("updated_at", { ascending: false }),
+      supabase.from("forms").select("id, title, status, updated_at, questions, settings, description").eq("user_id", user.id).order("updated_at", { ascending: false }),
     ]);
 
     if (profileRes.data) setProfile(profileRes.data);
     if (formsRes.data) {
-      setForms(formsRes.data);
-      if (formsRes.data.length > 0) {
-        const formIds = formsRes.data.map((f) => f.id);
-        const { count } = await supabase
+      const formsData = formsRes.data;
+      if (formsData.length > 0) {
+        const formIds = formsData.map((f) => f.id);
+        const { data: responsesData } = await supabase
           .from("form_responses")
-          .select("id", { count: "exact", head: true })
+          .select("form_id")
           .in("form_id", formIds);
-        setTotalResponses(count ?? 0);
+        const countMap: Record<string, number> = {};
+        (responsesData ?? []).forEach((r) => {
+          countMap[r.form_id] = (countMap[r.form_id] ?? 0) + 1;
+        });
+        const total = Object.values(countMap).reduce((a, b) => a + b, 0);
+        setTotalResponses(total);
+        setForms(formsData.map((f) => ({ ...f, responseCount: countMap[f.id] ?? 0 })));
+      } else {
+        setForms([]);
       }
     }
     setLoading(false);
@@ -66,9 +77,7 @@ const Dashboard = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const handleToggleStatus = async (formId: string, currentStatus: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleToggleStatus = async (formId: string, currentStatus: string) => {
     const newStatus = currentStatus === "active" ? "draft" : "active";
     const { error } = await supabase.from("forms").update({ status: newStatus }).eq("id", formId);
     if (error) {
@@ -79,17 +88,35 @@ const Dashboard = () => {
     }
   };
 
-  const handleCopyLink = (formId: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleCopyLink = (formId: string) => {
     const url = `${window.location.origin}/f/${formId}?preview=1`;
     navigator.clipboard.writeText(url);
     toast.success("Preview link copied!");
   };
 
-  const handleDeleteForm = async (formId: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleDuplicate = async (form: Form) => {
+    if (!user) return;
+    const { data, error } = await supabase
+      .from("forms")
+      .insert({
+        user_id: user.id,
+        title: `${form.title} (copy)`,
+        description: form.description,
+        questions: form.questions as never,
+        settings: form.settings as never,
+        status: "draft",
+      })
+      .select("id, title, status, updated_at, questions, settings, description")
+      .single();
+    if (error) {
+      toast.error("Failed to duplicate form");
+    } else if (data) {
+      setForms((prev) => [{ ...data, responseCount: 0 }, ...prev]);
+      toast.success("Form duplicated!");
+    }
+  };
+
+  const handleDeleteForm = async (formId: string) => {
     const { error } = await supabase.from("forms").delete().eq("id", formId);
     if (error) {
       toast.error("Failed to delete form");
@@ -208,7 +235,7 @@ const Dashboard = () => {
                     <div key={form.id} className="flex items-center gap-3 px-4 md:px-6 py-3 md:py-4 hover:bg-muted/30 transition-colors group">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <p className="font-medium text-sm text-foreground truncate max-w-[160px] sm:max-w-none">{form.title}</p>
+                          <p className="font-medium text-sm text-foreground truncate max-w-[140px] sm:max-w-none">{form.title}</p>
                           <span
                             className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
                               form.status === "active"
@@ -218,6 +245,12 @@ const Dashboard = () => {
                           >
                             {form.status}
                           </span>
+                          {/* Response count badge */}
+                          {(form.responseCount ?? 0) > 0 && (
+                            <span className="text-xs px-2 py-0.5 rounded-full font-medium shrink-0 bg-primary/10 text-primary">
+                              {form.responseCount} {form.responseCount === 1 ? "response" : "responses"}
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
@@ -233,10 +266,7 @@ const Dashboard = () => {
                       <div className="flex items-center gap-1.5 shrink-0">
                         <Switch
                           checked={form.status === "active"}
-                          onCheckedChange={() => {
-                            const fakeEvent = { preventDefault: () => {}, stopPropagation: () => {} } as unknown as React.MouseEvent;
-                            handleToggleStatus(form.id, form.status, fakeEvent);
-                          }}
+                          onCheckedChange={() => handleToggleStatus(form.id, form.status)}
                           aria-label="Toggle form status"
                         />
                       </div>
@@ -265,7 +295,7 @@ const Dashboard = () => {
                         </Link>
                       </div>
 
-                      {/* Action menu (always visible on mobile, visible on hover desktop) */}
+                      {/* Action menu */}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button className="p-1.5 rounded-md border border-border hover:border-primary hover:text-primary transition-colors md:opacity-0 md:group-hover:opacity-100">
@@ -285,7 +315,7 @@ const Dashboard = () => {
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="flex items-center gap-2"
-                            onClick={(e) => handleCopyLink(form.id, e as unknown as React.MouseEvent)}
+                            onClick={() => handleCopyLink(form.id)}
                           >
                             <Link2 size={13} /> Copy link
                           </DropdownMenuItem>
@@ -294,10 +324,16 @@ const Dashboard = () => {
                               <BarChart3 size={13} /> Results
                             </Link>
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="flex items-center gap-2"
+                            onClick={() => handleDuplicate(form)}
+                          >
+                            <Copy size={13} /> Duplicate
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive flex items-center gap-2"
-                            onClick={(e) => handleDeleteForm(form.id, e as unknown as React.MouseEvent)}
+                            onClick={() => handleDeleteForm(form.id)}
                           >
                             <Trash2 size={13} /> Delete
                           </DropdownMenuItem>

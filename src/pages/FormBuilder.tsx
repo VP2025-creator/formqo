@@ -784,7 +784,7 @@ const FormBuilder = () => {
     if (!user) return;
     setSaving(true);
     try {
-      if (formId) {
+      if (formId || (f.id && f.id.length === 36)) {
         // Update existing
         const { error } = await supabase
           .from("forms")
@@ -797,25 +797,31 @@ const FormBuilder = () => {
           })
           .eq("id", f.id);
         if (error) throw error;
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
       } else {
         // Insert new
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("forms")
           .insert({
-            id: f.id,
             user_id: user.id,
             title: f.title,
             description: f.description ?? null,
-            questions: f.questions as unknown as import("@/integrations/supabase/types").Json,
-            settings: f.settings as unknown as import("@/integrations/supabase/types").Json,
+            questions: f.questions as unknown as never,
+            settings: f.settings as unknown as never,
             status: f.status,
-          });
+          })
+          .select("id")
+          .single();
         if (error) throw error;
-        // Navigate to edit mode with the new id
-        navigate(`/builder?id=${f.id}`, { replace: true });
+        // Update form state and URL with the real UUID from Supabase
+        if (data) {
+          setForm((prev) => ({ ...prev, id: data.id }));
+          navigate(`/builder?id=${data.id}`, { replace: true });
+          setSaved(true);
+          setTimeout(() => setSaved(false), 2000);
+        }
       }
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Save failed";
       toast.error(msg);
