@@ -6,8 +6,15 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Plus, BarChart3, Eye, MoreHorizontal, Zap, Users,
   TrendingUp, FileText, Clock, ChevronRight, Pencil, Puzzle,
-  ArrowRight, Loader2,
+  ArrowRight, Loader2, Trash2,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 
 interface Form {
   id: string;
@@ -29,36 +36,49 @@ const Dashboard = () => {
   const [totalResponses, setTotalResponses] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  const loadData = async () => {
+    if (!user) return;
+    const [profileRes, formsRes] = await Promise.all([
+      supabase.from("profiles").select("full_name, plan").eq("id", user.id).single(),
+      supabase.from("forms").select("id, title, status, updated_at, questions").eq("user_id", user.id).order("updated_at", { ascending: false }),
+    ]);
+
+    if (profileRes.data) setProfile(profileRes.data);
+    if (formsRes.data) {
+      setForms(formsRes.data);
+      if (formsRes.data.length > 0) {
+        const formIds = formsRes.data.map((f) => f.id);
+        const { count } = await supabase
+          .from("form_responses")
+          .select("id", { count: "exact", head: true })
+          .in("form_id", formIds);
+        setTotalResponses(count ?? 0);
+      }
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
     if (!user) return;
-    const load = async () => {
-      const [profileRes, formsRes] = await Promise.all([
-        supabase.from("profiles").select("full_name, plan").eq("id", user.id).single(),
-        supabase.from("forms").select("id, title, status, updated_at, questions").eq("user_id", user.id).order("updated_at", { ascending: false }),
-      ]);
-
-      if (profileRes.data) setProfile(profileRes.data);
-      if (formsRes.data) {
-        setForms(formsRes.data);
-        // Count total responses across all forms
-        if (formsRes.data.length > 0) {
-          const formIds = formsRes.data.map((f) => f.id);
-          const { count } = await supabase
-            .from("form_responses")
-            .select("id", { count: "exact", head: true })
-            .in("form_id", formIds);
-          setTotalResponses(count ?? 0);
-        }
-      }
-      setLoading(false);
-    };
-    load();
+    loadData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  const handleDeleteForm = async (formId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const { error } = await supabase.from("forms").delete().eq("id", formId);
+    if (error) {
+      toast.error("Failed to delete form");
+    } else {
+      setForms((prev) => prev.filter((f) => f.id !== formId));
+      toast.success("Form deleted");
+    }
+  };
 
   const isAdmin = profile?.plan === "admin";
   const isFree = !isAdmin && (profile?.plan === "free" || !profile?.plan);
 
-  // Smart upgrade nudge conditions (free plan only)
   const formCount = forms.length;
   const showUpgradeNudge = isFree && (formCount >= 2 || totalResponses >= 80);
   const nudgeReason =
@@ -83,51 +103,51 @@ const Dashboard = () => {
     <div className="min-h-screen bg-muted/20">
       <Navbar variant="dashboard" userRole={isAdmin ? "admin" : "user"} />
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 py-6 md:py-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 md:mb-8">
           <div>
-            <h1 className="font-display font-bold text-2xl text-foreground">
+            <h1 className="font-display font-bold text-xl md:text-2xl text-foreground">
               {loading ? "My Forms" : `Hey, ${firstName} 👋`}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">Welcome back — here's what's happening</p>
           </div>
-          <Link to="/builder" className="btn-primary flex items-center gap-2 text-sm">
+          <Link to="/builder" className="btn-primary flex items-center gap-2 text-sm self-start sm:self-auto">
             <Plus size={16} />
             New form
           </Link>
         </div>
 
-        {/* Stats */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 size={24} className="animate-spin text-muted-foreground" />
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {/* Stats */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
               {[
                 { label: "Total responses", value: String(totalResponses), icon: BarChart3, sub: isFree ? `of 100 free` : "this month" },
                 { label: "Active forms", value: String(activeForms), icon: FileText, sub: `of ${formCount} total` },
                 { label: "Total forms", value: String(formCount), icon: TrendingUp, sub: isFree ? "of 3 (free plan)" : "unlimited" },
                 { label: "Plan", value: isAdmin ? "Admin" : (profile?.plan ?? "Free"), icon: Users, sub: isAdmin ? "Unlimited access" : "Upgrade for more" },
               ].map((stat) => (
-                <div key={stat.label} className="bg-card rounded-xl border border-border p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs text-muted-foreground">{stat.label}</span>
-                    <stat.icon size={15} className="text-muted-foreground" />
+                <div key={stat.label} className="bg-card rounded-xl border border-border p-3 md:p-4">
+                  <div className="flex items-center justify-between mb-2 md:mb-3">
+                    <span className="text-xs text-muted-foreground leading-tight">{stat.label}</span>
+                    <stat.icon size={15} className="text-muted-foreground shrink-0" />
                   </div>
-                  <p className="font-display font-bold text-2xl text-foreground capitalize">{stat.value}</p>
+                  <p className="font-display font-bold text-xl md:text-2xl text-foreground capitalize">{stat.value}</p>
                   <p className="text-xs text-muted-foreground mt-1">{stat.sub}</p>
                 </div>
               ))}
             </div>
 
-            {/* Smart upgrade nudge — shown only when approaching limits */}
+            {/* Smart upgrade nudge */}
             {showUpgradeNudge && (
-              <div className="rounded-2xl border border-primary bg-primary/5 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 animate-fade-in">
-                <div className="flex items-start gap-4">
-                  <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shrink-0">
+              <div className="rounded-2xl border border-primary bg-primary/5 p-4 md:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 animate-fade-in">
+                <div className="flex items-start gap-3 md:gap-4">
+                  <div className="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-primary flex items-center justify-center shrink-0">
                     <Zap size={16} className="text-primary-foreground" />
                   </div>
                   <div>
@@ -137,7 +157,7 @@ const Dashboard = () => {
                     </p>
                   </div>
                 </div>
-                <Link to="/pricing" className="btn-primary flex items-center gap-1.5 text-sm whitespace-nowrap">
+                <Link to="/pricing" className="btn-primary flex items-center gap-1.5 text-sm whitespace-nowrap self-start sm:self-auto">
                   Upgrade to Pro <ArrowRight size={13} />
                 </Link>
               </div>
@@ -145,7 +165,7 @@ const Dashboard = () => {
 
             {/* Forms list */}
             <div className="bg-card rounded-2xl border border-border overflow-hidden mb-6">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-border">
                 <h2 className="font-display font-semibold text-sm">Your forms</h2>
                 <span className="text-xs text-muted-foreground">
                   {formCount} form{formCount !== 1 ? "s" : ""} {isFree ? `· free plan (max 3)` : ""}
@@ -162,12 +182,12 @@ const Dashboard = () => {
               ) : (
                 <div className="divide-y divide-border">
                   {forms.map((form) => (
-                    <div key={form.id} className="flex items-center gap-4 px-6 py-4 hover:bg-muted/30 transition-colors group">
+                    <div key={form.id} className="flex items-center gap-3 px-4 md:px-6 py-3 md:py-4 hover:bg-muted/30 transition-colors group">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="font-medium text-sm text-foreground truncate">{form.title}</p>
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <p className="font-medium text-sm text-foreground truncate max-w-[160px] sm:max-w-none">{form.title}</p>
                           <span
-                            className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
                               form.status === "active"
                                 ? "bg-green-50 text-green-700"
                                 : "bg-muted text-muted-foreground"
@@ -185,7 +205,9 @@ const Dashboard = () => {
                           </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+
+                      {/* Desktop action buttons */}
+                      <div className="hidden md:flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Link
                           to={`/builder?id=${form.id}`}
                           className="text-xs px-3 py-1.5 rounded-md border border-border hover:border-primary hover:text-primary transition-colors flex items-center gap-1"
@@ -206,22 +228,51 @@ const Dashboard = () => {
                         >
                           <BarChart3 size={12} /> Results
                         </Link>
-                        <button className="p-1.5 rounded-md border border-border hover:border-primary hover:text-primary transition-colors">
-                          <MoreHorizontal size={14} />
-                        </button>
                       </div>
+
+                      {/* Action menu (always visible on mobile, visible on hover desktop) */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="p-1.5 rounded-md border border-border hover:border-primary hover:text-primary transition-colors md:opacity-0 md:group-hover:opacity-100">
+                            <MoreHorizontal size={14} />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                          <DropdownMenuItem asChild>
+                            <Link to={`/builder?id=${form.id}`} className="flex items-center gap-2">
+                              <Pencil size={13} /> Edit
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link to={`/f/${form.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                              <Eye size={13} /> Preview
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link to={`/forms/${form.id}/responses`} className="flex items-center gap-2">
+                              <BarChart3 size={13} /> Results
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive flex items-center gap-2"
+                            onClick={(e) => handleDeleteForm(form.id, e as unknown as React.MouseEvent)}
+                          >
+                            <Trash2 size={13} /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Generic upgrade banner — only if nudge not shown and user is free */}
+            {/* Generic upgrade banner */}
             {!showUpgradeNudge && isFree && (
-              <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
-                    <Zap size={18} className="text-primary-foreground" />
+              <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 md:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+                <div className="flex items-start gap-3 md:gap-4">
+                  <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
+                    <Zap size={16} className="text-primary-foreground" />
                   </div>
                   <div>
                     <h3 className="font-display font-semibold text-sm text-foreground mb-1">Upgrade to Pro</h3>
@@ -230,7 +281,7 @@ const Dashboard = () => {
                     </p>
                   </div>
                 </div>
-                <Link to="/pricing" className="btn-primary flex items-center gap-1.5 text-sm whitespace-nowrap">
+                <Link to="/pricing" className="btn-primary flex items-center gap-1.5 text-sm whitespace-nowrap self-start sm:self-auto">
                   Upgrade now <ChevronRight size={14} />
                 </Link>
               </div>
@@ -239,9 +290,9 @@ const Dashboard = () => {
             {/* Integrations quick link */}
             <Link
               to="/dashboard/integrations"
-              className="flex items-center justify-between bg-card rounded-2xl border border-border px-6 py-4 hover:border-primary/30 transition-colors group"
+              className="flex items-center justify-between bg-card rounded-2xl border border-border px-4 md:px-6 py-4 hover:border-primary/30 transition-colors group"
             >
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3 md:gap-4">
                 <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center">
                   <Puzzle size={16} className="text-muted-foreground" />
                 </div>
@@ -250,7 +301,7 @@ const Dashboard = () => {
                   <p className="text-xs text-muted-foreground">Connect Slack, Zapier, email notifications</p>
                 </div>
               </div>
-              <ChevronRight size={15} className="text-muted-foreground group-hover:text-primary transition-colors" />
+              <ChevronRight size={15} className="text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
             </Link>
           </>
         )}
