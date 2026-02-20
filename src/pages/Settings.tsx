@@ -67,21 +67,18 @@ const Settings = () => {
     const ext = file.name.split(".").pop();
     const path = `${user.id}/avatar.${ext}`;
 
-    // Try to upload; bucket may not exist so we fall back to a data URL preview
     const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
-    if (!error) {
-      const { data } = supabase.storage.from("avatars").getPublicUrl(path);
-      const url = data.publicUrl + `?t=${Date.now()}`;
-      setAvatarUrl(url);
-      await supabase.from("profiles").update({ avatar_url: url }).eq("id", user.id);
-      toast({ title: "Avatar updated!" });
-    } else {
-      // Fallback: show local preview without persisting
-      const reader = new FileReader();
-      reader.onload = (ev) => setAvatarUrl(ev.target?.result as string);
-      reader.readAsDataURL(file);
-      toast({ title: "Avatar preview set", description: "Storage bucket not configured — avatar won't persist.", variant: "destructive" });
+    if (error) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+      setAvatarUploading(false);
+      return;
     }
+
+    const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+    const url = data.publicUrl + `?t=${Date.now()}`;
+    setAvatarUrl(url);
+    await supabase.from("profiles").update({ avatar_url: url }).eq("id", user.id);
+    toast({ title: "Avatar updated!" });
     setAvatarUploading(false);
   };
 
