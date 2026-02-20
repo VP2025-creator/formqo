@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Check, Minus, Zap, ArrowRight, Sparkles } from "lucide-react";
+import { usePageMeta } from "@/hooks/use-page-meta";
 
 const features = [
   // Category: Forms
@@ -98,6 +99,15 @@ function FeatureCell({ value }: { value: boolean | string }) {
 
 const Pricing = () => {
   const [annual, setAnnual] = useState(false);
+
+  usePageMeta({
+    title: "Pricing — Formqo | Simple, Honest Plans",
+    description: "Start free. Upgrade to Pro for £15/mo or Business for £39/mo. Unlock unlimited forms, AI question generation, and custom domains.",
+    ogImage: "https://formqo.lovable.app/og-pricing.png",
+    ogType: "website",
+    twitterCard: "summary_large_image",
+  });
+
 
   const categories = [...new Set(features.map((f) => f.category))];
 
