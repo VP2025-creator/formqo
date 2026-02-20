@@ -15,6 +15,7 @@ import FormResponses from "./pages/FormResponses";
 import Integrations from "./pages/Integrations";
 import Pricing from "./pages/Pricing";
 import Settings from "./pages/Settings";
+import Templates from "./pages/Templates";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
             <Route path="/dashboard/integrations" element={<Integrations />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/templates" element={<Templates />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
