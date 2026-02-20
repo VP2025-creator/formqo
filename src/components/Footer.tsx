@@ -1,15 +1,12 @@
-import { Link } from "react-router-dom";
+import Logo from "@/components/Logo";
 
 const Footer = () => (
   <footer className="border-t border-border bg-background py-16">
     <div className="container mx-auto px-4">
       <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
         <div className="col-span-2">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-display font-bold text-sm">F</span>
-            </div>
-            <span className="font-display font-bold text-lg">Formqo</span>
+          <div className="mb-4">
+            <Logo height={24} />
           </div>
           <p className="text-muted-foreground text-sm max-w-xs leading-relaxed">
             Beautiful forms that convert. Built for teams who care about data quality.
@@ -47,8 +44,8 @@ const Footer = () => (
         </div>
       </div>
       <div className="border-t border-border pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <p className="text-xs text-muted-foreground">© 2025 Formqo. All rights reserved.</p>
-        <p className="text-xs text-muted-foreground">Made with care for form builders everywhere.</p>
+        <p className="text-xs text-muted-foreground">© 2026 Formqo. All rights reserved.</p>
+        <p className="text-xs text-muted-foreground">Crafted with ♡ by TDV Labs</p>
       </div>
     </div>
   </footer>
