@@ -1,21 +1,21 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import {
   Plus, Trash2, GripVertical, ChevronDown, Eye,
   AlignLeft, AlignJustify, List, Star, Mail, ToggleLeft,
   Hash, Calendar, ChevronRight, ChevronUp, ArrowLeft,
   Settings, Share2, Check, X, MoreHorizontal, Smartphone, Monitor,
-  Sparkles, Loader2, Copy, Code2, Link2, QrCode
+  Sparkles, Loader2, Copy, Code2, Link2, QrCode, Menu, Layers,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Question, QuestionType, Form, QuestionOption } from "@/types/form";
-import { mockForms } from "@/data/mockForms";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile.tsx";
 
 // ─── Formqo subdomain constants ──────────────────────────────────────────────
-// share.formqo.com/f/{id}   — public form renderer (Cloudflare Worker)
-// embed.formqo.com/{id}.js  — embed loader JS snippet
-
 const SHARE_BASE = "https://share.formqo.com/f";
 const EMBED_BASE = "https://embed.formqo.com";
 
@@ -98,26 +98,18 @@ function ShareModal({ form, onClose }: { form: Form; onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Overlay */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-
-      {/* Modal */}
       <div className="relative bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
             <h2 className="font-display font-bold text-lg">Share form</h2>
             <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-xs">{form.title}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground"
-          >
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
             <X size={16} />
           </button>
         </div>
 
-        {/* Tabs */}
         <div className="flex border-b border-border px-6">
           {(["link", "embed", "qr"] as const).map((t) => {
             const icons = { link: Link2, embed: Code2, qr: QrCode };
@@ -128,26 +120,20 @@ function ShareModal({ form, onClose }: { form: Form; onClose: () => void }) {
                 key={t}
                 onClick={() => setTab(t)}
                 className={`flex items-center gap-1.5 px-4 py-3 text-sm font-semibold border-b-2 transition-colors -mb-px ${
-                  tab === t
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
+                  tab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <Icon size={13} />
-                {labels[t]}
+                <Icon size={13} /> {labels[t]}
               </button>
             );
           })}
         </div>
 
-        {/* Content */}
         <div className="px-6 py-6">
           {tab === "link" && (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                  Public URL
-                </label>
+                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Public URL</label>
                 <p className="text-xs text-muted-foreground mb-3">
                   Hosted on <span className="font-mono font-medium text-foreground">share.formqo.com</span> — fully rendered with OG tags and canonical URLs.
                 </p>
@@ -163,22 +149,6 @@ function ShareModal({ form, onClose }: { form: Form; onClose: () => void }) {
                   </button>
                 </div>
               </div>
-
-              <div className="p-4 rounded-xl bg-muted/30 border border-border">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500" />
-                  <span className="text-xs font-semibold text-foreground">share.formqo.com</span>
-                </div>
-                <ul className="space-y-1">
-                  {["Fully rendered HTML for embeds & social", "Open Graph + canonical URL injection", "Custom domain routing (CNAME → Worker)", "Cookie session shared via .formqo.com"].map((item) => (
-                    <li key={item} className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Check size={11} className="text-green-500 shrink-0" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
               <a
                 href={shareUrl}
                 target="_blank"
@@ -193,13 +163,7 @@ function ShareModal({ form, onClose }: { form: Form; onClose: () => void }) {
           {tab === "embed" && (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                  Embed snippet
-                </label>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Paste this into any HTML page. The script loads from{" "}
-                  <span className="font-mono font-medium text-foreground">embed.formqo.com</span> and injects the form.
-                </p>
+                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Embed snippet</label>
                 <div className="relative">
                   <pre className="px-4 py-4 rounded-xl border border-border bg-foreground text-green-400 text-xs font-mono leading-relaxed overflow-x-auto whitespace-pre-wrap break-all">
                     {embedSnippet}
@@ -212,59 +176,15 @@ function ShareModal({ form, onClose }: { form: Form; onClose: () => void }) {
                   </button>
                 </div>
               </div>
-
-              <div className="p-4 rounded-xl bg-muted/30 border border-border">
-                <p className="text-xs font-semibold text-foreground mb-1">How it works</p>
-                <p className="text-xs text-muted-foreground">
-                  The loader script at <span className="font-mono">embed.formqo.com/{form.id}.js</span> injects a
-                  sandboxed iframe pointing to <span className="font-mono">share.formqo.com</span>. Custom domain support
-                  via CNAME → Worker is available on Pro.
-                </p>
-              </div>
             </div>
           )}
 
           {tab === "qr" && (
             <div className="flex flex-col items-center gap-5">
-              <div>
-                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 text-center">
-                  QR Code
-                </label>
-                <p className="text-xs text-muted-foreground text-center">
-                  Scan to open on <span className="font-mono font-medium text-foreground">share.formqo.com</span>
-                </p>
-              </div>
-
               <div className="p-5 bg-white rounded-2xl border border-border shadow-sm">
-                <QRCodeSVG
-                  value={shareUrl}
-                  size={200}
-                  bgColor="#ffffff"
-                  fgColor="#1a1a2e"
-                  level="M"
-                  includeMargin={false}
-                />
+                <QRCodeSVG value={shareUrl} size={200} bgColor="#ffffff" fgColor="#1a1a2e" level="M" includeMargin={false} />
               </div>
-
               <p className="text-xs text-muted-foreground font-mono text-center break-all max-w-xs">{shareUrl}</p>
-
-              <button
-                onClick={() => {
-                  const svg = document.querySelector(".qr-svg-container svg");
-                  if (!svg) return;
-                  const svgData = new XMLSerializer().serializeToString(svg);
-                  const blob = new Blob([svgData], { type: "image/svg+xml" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = `formqo-${form.id}-qr.svg`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                }}
-                className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl border border-border hover:bg-muted transition-colors text-sm font-medium"
-              >
-                <QrCode size={13} /> Download SVG
-              </button>
             </div>
           )}
         </div>
@@ -276,12 +196,7 @@ function ShareModal({ form, onClose }: { form: Form; onClose: () => void }) {
 // ─── AI Suggestion Panel ─────────────────────────────────────────────────────
 
 function AISuggestionPanel({
-  suggestions,
-  loading,
-  error,
-  onAdd,
-  onAddAll,
-  onDismiss,
+  suggestions, loading, error, onAdd, onAddAll, onDismiss,
 }: {
   suggestions: AISuggestion[];
   loading: boolean;
@@ -294,7 +209,6 @@ function AISuggestionPanel({
 
   return (
     <div className="border border-primary/20 bg-primary/3 rounded-2xl overflow-hidden">
-      {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-primary/10">
         <div className="flex items-center gap-1.5 flex-1">
           <Sparkles size={13} className="text-primary" />
@@ -302,17 +216,11 @@ function AISuggestionPanel({
           {loading && <Loader2 size={11} className="text-primary animate-spin" />}
         </div>
         {suggestions.length > 0 && !loading && (
-          <button
-            onClick={onAddAll}
-            className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
-          >
+          <button onClick={onAddAll} className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors">
             Add all
           </button>
         )}
-        <button
-          onClick={onDismiss}
-          className="p-1 text-muted-foreground hover:text-foreground transition-colors"
-        >
+        <button onClick={onDismiss} className="p-1 text-muted-foreground hover:text-foreground transition-colors">
           <X size={12} />
         </button>
       </div>
@@ -321,20 +229,14 @@ function AISuggestionPanel({
         <div className="px-4 py-5 flex items-center gap-3">
           <div className="flex gap-1">
             {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="w-1.5 h-1.5 rounded-full bg-primary/50 animate-bounce"
-                style={{ animationDelay: `${i * 150}ms` }}
-              />
+              <div key={i} className="w-1.5 h-1.5 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
             ))}
           </div>
           <span className="text-xs text-muted-foreground">Generating questions…</span>
         </div>
       )}
 
-      {error && (
-        <div className="px-4 py-3 text-xs text-destructive">{error}</div>
-      )}
+      {error && <div className="px-4 py-3 text-xs text-destructive">{error}</div>}
 
       {!loading && suggestions.length > 0 && (
         <div className="divide-y divide-border/50">
@@ -342,10 +244,7 @@ function AISuggestionPanel({
             const Icon = TYPE_ICONS[s.type] ?? AlignLeft;
             const typeDef = QUESTION_TYPES.find(t => t.type === s.type);
             return (
-              <div
-                key={i}
-                className="flex items-start gap-3 px-4 py-3 group hover:bg-primary/5 transition-colors"
-              >
+              <div key={i} className="flex items-start gap-3 px-4 py-3 group hover:bg-primary/5 transition-colors">
                 <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
                   <Icon size={11} className="text-primary" />
                 </div>
@@ -353,9 +252,7 @@ function AISuggestionPanel({
                   <p className="text-sm font-medium text-foreground leading-snug">{s.title}</p>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-xs text-muted-foreground">{typeDef?.label}</span>
-                    {s.required && (
-                      <span className="text-xs text-primary font-medium">required</span>
-                    )}
+                    {s.required && <span className="text-xs text-primary font-medium">required</span>}
                   </div>
                 </div>
                 <button
@@ -415,17 +312,10 @@ function TypePicker({ current, onChange }: { current: QuestionType; onChange: (t
   );
 }
 
-// ─── Options Editor (for multiple choice) ───────────────────────────────────
+// ─── Options Editor ──────────────────────────────────────────────────────────
 
-function OptionsEditor({
-  options,
-  onChange,
-}: {
-  options: QuestionOption[];
-  onChange: (o: QuestionOption[]) => void;
-}) {
-  const update = (id: string, label: string) =>
-    onChange(options.map((o) => (o.id === id ? { ...o, label } : o)));
+function OptionsEditor({ options, onChange }: { options: QuestionOption[]; onChange: (o: QuestionOption[]) => void }) {
+  const update = (id: string, label: string) => onChange(options.map((o) => (o.id === id ? { ...o, label } : o)));
   const remove = (id: string) => onChange(options.filter((o) => o.id !== id));
   const add = () => onChange([...options, { id: uid(), label: `Option ${options.length + 1}` }]);
 
@@ -433,26 +323,18 @@ function OptionsEditor({
     <div className="space-y-2">
       {options.map((opt, idx) => (
         <div key={opt.id} className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground w-5 shrink-0 font-medium">
-            {String.fromCharCode(65 + idx)}
-          </span>
+          <span className="text-xs text-muted-foreground w-5 shrink-0 font-medium">{String.fromCharCode(65 + idx)}</span>
           <input
             value={opt.label}
             onChange={(e) => update(opt.id, e.target.value)}
             className="flex-1 px-3 py-2 text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
           />
-          <button
-            onClick={() => remove(opt.id)}
-            className="text-muted-foreground hover:text-destructive p-1 rounded transition-colors"
-          >
+          <button onClick={() => remove(opt.id)} className="text-muted-foreground hover:text-destructive p-1 rounded transition-colors">
             <X size={13} />
           </button>
         </div>
       ))}
-      <button
-        onClick={add}
-        className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors mt-1 font-medium"
-      >
+      <button onClick={add} className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors mt-1 font-medium">
         <Plus size={12} /> Add option
       </button>
     </div>
@@ -461,20 +343,11 @@ function OptionsEditor({
 
 // ─── Question Editor Panel ───────────────────────────────────────────────────
 
-function QuestionEditor({
-  question,
-  index,
-  onChange,
-}: {
-  question: Question;
-  index: number;
-  onChange: (q: Question) => void;
-}) {
+function QuestionEditor({ question, index, onChange }: { question: Question; index: number; onChange: (q: Question) => void }) {
   const update = (partial: Partial<Question>) => onChange({ ...question, ...partial });
 
   return (
     <div className="space-y-5">
-      {/* Header */}
       <div className="flex items-center gap-2 mb-1">
         <span className="text-xs font-semibold text-muted-foreground">Question {index + 1}</span>
         <TypePicker
@@ -486,11 +359,8 @@ function QuestionEditor({
         />
       </div>
 
-      {/* Title */}
       <div>
-        <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
-          Question title *
-        </label>
+        <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Question title *</label>
         <input
           value={question.title}
           onChange={(e) => update({ title: e.target.value })}
@@ -499,7 +369,6 @@ function QuestionEditor({
         />
       </div>
 
-      {/* Description */}
       <div>
         <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
           Description <span className="font-normal normal-case">(optional)</span>
@@ -512,12 +381,9 @@ function QuestionEditor({
         />
       </div>
 
-      {/* Placeholder */}
       {["short_text", "long_text", "email", "number"].includes(question.type) && (
         <div>
-          <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
-            Placeholder
-          </label>
+          <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Placeholder</label>
           <input
             value={question.placeholder ?? ""}
             onChange={(e) => update({ placeholder: e.target.value })}
@@ -527,12 +393,9 @@ function QuestionEditor({
         </div>
       )}
 
-      {/* Multiple choice options */}
       {(question.type === "multiple_choice" || question.type === "dropdown") && question.options && (
         <div>
-          <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-            Options
-          </label>
+          <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Options</label>
           <OptionsEditor options={question.options} onChange={(opts) => update({ options: opts })} />
           {question.type === "multiple_choice" && (
             <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
@@ -548,21 +411,16 @@ function QuestionEditor({
         </div>
       )}
 
-      {/* Rating max */}
       {question.type === "rating" && (
         <div>
-          <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-            Scale (max rating)
-          </label>
+          <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Scale (max rating)</label>
           <div className="flex gap-2">
             {[3, 5, 7, 10].map((n) => (
               <button
                 key={n}
                 onClick={() => update({ maxRating: n })}
                 className={`px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${
-                  question.maxRating === n
-                    ? "border-primary bg-primary/5 text-primary"
-                    : "border-border text-muted-foreground hover:border-primary/40"
+                  question.maxRating === n ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
                 }`}
               >
                 {n}
@@ -572,7 +430,6 @@ function QuestionEditor({
         </div>
       )}
 
-      {/* Required toggle */}
       <div className="pt-2 border-t border-border">
         <label className="flex items-center gap-3 cursor-pointer select-none">
           <div
@@ -600,25 +457,14 @@ function LivePreview({ form, activeIdx, device }: { form: Form; activeIdx: numbe
   return (
     <div className={`flex items-center justify-center ${device === "mobile" ? "py-4" : ""}`}>
       <div className={containerClasses}>
-        <div
-          className="w-full h-full overflow-y-auto flex flex-col"
-          style={{ background: "hsl(var(--foreground))", fontFamily: "'Inter', sans-serif" }}
-        >
-          {/* Progress */}
+        <div className="w-full h-full overflow-y-auto flex flex-col" style={{ background: "hsl(var(--foreground))", fontFamily: "'Inter', sans-serif" }}>
           <div className="w-full h-0.5 bg-white/10 shrink-0">
-            <div
-              className="h-full bg-white transition-all"
-              style={{ width: `${((activeIdx + 1) / Math.max(form.questions.length, 1)) * 100}%` }}
-            />
+            <div className="h-full bg-white transition-all" style={{ width: `${((activeIdx + 1) / Math.max(form.questions.length, 1)) * 100}%` }} />
           </div>
-
-          {/* Content */}
           <div className="flex-1 p-6 flex flex-col justify-center">
             {q ? (
               <>
-                <p className="text-white/40 text-xs mb-4 font-body">
-                  {activeIdx + 1} → {QUESTION_TYPES.find(t => t.type === q.type)?.label}
-                </p>
+                <p className="text-white/40 text-xs mb-4 font-body">{activeIdx + 1} → {QUESTION_TYPES.find(t => t.type === q.type)?.label}</p>
                 <h3 className="font-display font-bold text-white text-lg leading-tight mb-2">
                   {q.required && <span className="text-primary">* </span>}
                   {q.title || <span className="opacity-30 italic font-normal">Untitled question</span>}
@@ -626,25 +472,19 @@ function LivePreview({ form, activeIdx, device }: { form: Form; activeIdx: numbe
                 {q.description && <p className="text-white/50 text-xs mb-4">{q.description}</p>}
 
                 {(q.type === "short_text" || q.type === "email" || q.type === "number") && (
-                  <div className="border-b border-white/25 pb-2 text-white/30 text-sm">
-                    {q.placeholder || "Type your answer here..."}
-                  </div>
+                  <div className="border-b border-white/25 pb-2 text-white/30 text-sm">{q.placeholder || "Type your answer here..."}</div>
                 )}
                 {q.type === "long_text" && (
-                  <div className="border border-white/20 rounded-lg p-3 text-white/30 text-xs h-16">
-                    {q.placeholder || "Type your answer here..."}
-                  </div>
+                  <div className="border border-white/20 rounded-lg p-3 text-white/30 text-xs h-16">{q.placeholder || "Type your answer here..."}</div>
                 )}
                 {q.type === "rating" && (
                   <div className="flex gap-2 mt-2">
                     {Array.from({ length: q.maxRating ?? 5 }, (_, i) => (
-                      <div key={i} className="w-8 h-8 rounded-lg border border-white/25 flex items-center justify-center text-white/50 text-xs font-bold">
-                        {i + 1}
-                      </div>
+                      <div key={i} className="w-8 h-8 rounded-lg border border-white/25 flex items-center justify-center text-white/50 text-xs font-bold">{i + 1}</div>
                     ))}
                   </div>
                 )}
-                {(q.type === "multiple_choice") && q.options && (
+                {q.type === "multiple_choice" && q.options && (
                   <div className="space-y-2 mt-2">
                     {q.options.slice(0, 3).map((opt, i) => (
                       <div key={opt.id} className="flex items-center gap-2 border border-white/20 rounded-lg px-3 py-2">
@@ -671,13 +511,9 @@ function LivePreview({ form, activeIdx, device }: { form: Form; activeIdx: numbe
                 </button>
               </>
             ) : (
-              <div className="text-center text-white/30">
-                <p className="text-sm">No questions yet</p>
-              </div>
+              <div className="text-center text-white/30"><p className="text-sm">No questions yet</p></div>
             )}
           </div>
-
-          {/* Branding */}
           <div className="flex justify-center pb-3">
             <p className="text-white/20 text-[10px]">Powered by <span className="font-bold">Formqo</span></p>
           </div>
@@ -687,18 +523,10 @@ function LivePreview({ form, activeIdx, device }: { form: Form; activeIdx: numbe
   );
 }
 
-// ─── Question List (sidebar) ─────────────────────────────────────────────────
+// ─── Question List Item ──────────────────────────────────────────────────────
 
 function QuestionListItem({
-  question,
-  index,
-  isActive,
-  onSelect,
-  onMoveUp,
-  onMoveDown,
-  onDelete,
-  canMoveUp,
-  canMoveDown,
+  question, index, isActive, onSelect, onMoveUp, onMoveDown, onDelete, canMoveUp, canMoveDown,
 }: {
   question: Question;
   index: number;
@@ -716,18 +544,14 @@ function QuestionListItem({
     <div
       onClick={onSelect}
       className={`group flex items-start gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all border ${
-        isActive
-          ? "bg-primary/5 border-primary/30"
-          : "border-transparent hover:bg-muted/60"
+        isActive ? "bg-primary/5 border-primary/30" : "border-transparent hover:bg-muted/60"
       }`}
     >
       <GripVertical size={14} className="text-muted-foreground/40 mt-0.5 shrink-0" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
           <Icon size={12} className={isActive ? "text-primary" : "text-muted-foreground"} />
-          <span className={`text-xs font-semibold ${isActive ? "text-primary" : "text-muted-foreground"}`}>
-            {index + 1}
-          </span>
+          <span className={`text-xs font-semibold ${isActive ? "text-primary" : "text-muted-foreground"}`}>{index + 1}</span>
           {question.required && <span className="text-primary text-xs">*</span>}
         </div>
         <p className="text-sm font-medium text-foreground truncate">
@@ -735,24 +559,13 @@ function QuestionListItem({
         </p>
       </div>
       <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-        <button
-          onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
-          disabled={!canMoveUp}
-          className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
-        >
+        <button onClick={(e) => { e.stopPropagation(); onMoveUp(); }} disabled={!canMoveUp} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors">
           <ChevronUp size={12} />
         </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
-          disabled={!canMoveDown}
-          className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
-        >
+        <button onClick={(e) => { e.stopPropagation(); onMoveDown(); }} disabled={!canMoveDown} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors">
           <ChevronDown size={12} />
         </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="p-0.5 text-muted-foreground hover:text-destructive transition-colors"
-        >
+        <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-0.5 text-muted-foreground hover:text-destructive transition-colors">
           <Trash2 size={12} />
         </button>
       </div>
@@ -760,39 +573,168 @@ function QuestionListItem({
   );
 }
 
+// ─── Question Sidebar Content ─────────────────────────────────────────────────
+
+function QuestionSidebarContent({
+  form,
+  activeIdx,
+  setActiveIdx,
+  showTypeMenu,
+  setShowTypeMenu,
+  moveQuestion,
+  deleteQuestion,
+  addQuestion,
+}: {
+  form: Form;
+  activeIdx: number;
+  setActiveIdx: (i: number) => void;
+  showTypeMenu: boolean;
+  setShowTypeMenu: (v: boolean) => void;
+  moveQuestion: (from: number, to: number) => void;
+  deleteQuestion: (idx: number) => void;
+  addQuestion: (type: QuestionType) => void;
+}) {
+  return (
+    <>
+      <div className="px-3 pt-3 pb-2">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1 mb-2">Questions</p>
+      </div>
+      <div className="flex-1 overflow-y-auto px-2 space-y-1">
+        {form.questions.length === 0 && (
+          <div className="text-center py-10 px-4">
+            <p className="text-muted-foreground text-sm mb-1">No questions yet</p>
+            <p className="text-muted-foreground text-xs">Add your first question below</p>
+          </div>
+        )}
+        {form.questions.map((q, idx) => (
+          <QuestionListItem
+            key={q.id}
+            question={q}
+            index={idx}
+            isActive={idx === activeIdx}
+            onSelect={() => setActiveIdx(idx)}
+            onMoveUp={() => moveQuestion(idx, idx - 1)}
+            onMoveDown={() => moveQuestion(idx, idx + 1)}
+            onDelete={() => deleteQuestion(idx)}
+            canMoveUp={idx > 0}
+            canMoveDown={idx < form.questions.length - 1}
+          />
+        ))}
+      </div>
+      <div className="p-3 border-t border-border relative">
+        <button
+          onClick={() => setShowTypeMenu(!showTypeMenu)}
+          className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/3 text-muted-foreground hover:text-primary text-sm font-medium transition-all"
+        >
+          <Plus size={15} /> Add question
+        </button>
+        {showTypeMenu && (
+          <div className="absolute bottom-full left-2 right-2 mb-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden z-50 max-h-80 overflow-y-auto">
+            {QUESTION_TYPES.map((t) => {
+              const TIcon = t.icon;
+              return (
+                <button
+                  key={t.type}
+                  onClick={() => addQuestion(t.type)}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/60 transition-colors text-left"
+                >
+                  <TIcon size={14} className="text-primary shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">{t.label}</p>
+                    <p className="text-xs text-muted-foreground">{t.description}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ─── Preview Panel Content ────────────────────────────────────────────────────
+
+function PreviewPanelContent({
+  form,
+  activeIdx,
+  previewDevice,
+  setPreviewDevice,
+  setActivePanel,
+  activePanel,
+}: {
+  form: Form;
+  activeIdx: number;
+  previewDevice: "mobile" | "desktop";
+  setPreviewDevice: (d: "mobile" | "desktop") => void;
+  setActivePanel: (p: "editor" | "settings") => void;
+  activePanel: "editor" | "settings";
+}) {
+  return (
+    <>
+      <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-border">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Preview</p>
+        <div className="flex gap-1 bg-muted rounded-lg p-0.5">
+          <button
+            onClick={() => setPreviewDevice("mobile")}
+            className={`p-1.5 rounded-md transition-colors ${previewDevice === "mobile" ? "bg-card shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <Smartphone size={13} />
+          </button>
+          <button
+            onClick={() => setPreviewDevice("desktop")}
+            className={`p-1.5 rounded-md transition-colors ${previewDevice === "desktop" ? "bg-card shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <Monitor size={13} />
+          </button>
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto px-4 py-4 flex items-start justify-center">
+        <LivePreview form={form} activeIdx={activeIdx} device={previewDevice} />
+      </div>
+      <div className="border-t border-border px-4 py-3 flex items-center gap-2 text-xs">
+        <button
+          onClick={() => setActivePanel("settings")}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors font-medium ${
+            activePanel === "settings" ? "bg-primary/8 text-primary" : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Settings size={12} /> Settings
+        </button>
+        <span className="ml-auto text-muted-foreground">{form.questions.length} Q</span>
+      </div>
+    </>
+  );
+}
+
 // ─── Main FormBuilder ─────────────────────────────────────────────────────────
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
+const emptyForm = (id: string): Form => ({
+  id,
+  title: "Untitled form",
+  questions: [],
+  settings: { primaryColor: "hsl(357 95% 22%)", showBranding: true },
+  status: "draft",
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+});
+
 const FormBuilder = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const isMobile = useIsMobile();
   const formId = searchParams.get("id");
 
-  const initial: Form = formId
-    ? (mockForms.find((f) => f.id === formId) ?? {
-        id: uid(),
-        title: "Untitled form",
-        questions: [],
-        settings: { primaryColor: "hsl(357 95% 22%)", showBranding: true },
-        status: "draft",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      })
-    : {
-        id: uid(),
-        title: "Untitled form",
-        questions: [],
-        settings: { primaryColor: "hsl(357 95% 22%)", showBranding: true },
-        status: "draft",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-  const [form, setForm] = useState<Form>(initial);
+  const [form, setForm] = useState<Form>(emptyForm(formId ?? uid()));
+  const [loading, setLoading] = useState(!!formId);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [activeIdx, setActiveIdx] = useState<number>(0);
   const [previewDevice, setPreviewDevice] = useState<"mobile" | "desktop">("mobile");
   const [showTypeMenu, setShowTypeMenu] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [activePanel, setActivePanel] = useState<"editor" | "settings">("editor");
   const [showShareModal, setShowShareModal] = useState(false);
 
@@ -803,14 +745,105 @@ const FormBuilder = () => {
   const [aiDismissed, setAiDismissed] = useState(false);
   const [lastFetchedTitle, setLastFetchedTitle] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const titleRef = useRef<HTMLInputElement>(null);
 
-  // Debounced AI suggestions on title change
+  // ── Load form from Supabase ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!formId) return;
+    const load = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("forms")
+        .select("*")
+        .eq("id", formId)
+        .single();
+
+      if (error || !data) {
+        toast.error("Form not found");
+        navigate("/dashboard");
+        return;
+      }
+
+      setForm({
+        id: data.id,
+        title: data.title,
+        description: data.description ?? undefined,
+        questions: Array.isArray(data.questions) ? (data.questions as unknown as import("@/types/form").Question[]) : [],
+        settings: (data.settings as unknown as Form["settings"]) ?? { primaryColor: "hsl(357 95% 22%)", showBranding: true },
+        status: data.status as Form["status"],
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      });
+      setLoading(false);
+    };
+    load();
+  }, [formId, navigate]);
+
+  // ── Save form to Supabase ──────────────────────────────────────────────────
+  const saveForm = useCallback(async (f: Form) => {
+    if (!user) return;
+    setSaving(true);
+    try {
+      if (formId) {
+        // Update existing
+        const { error } = await supabase
+          .from("forms")
+          .update({
+            title: f.title,
+            description: f.description ?? null,
+            questions: f.questions as unknown as import("@/integrations/supabase/types").Json,
+            settings: f.settings as unknown as import("@/integrations/supabase/types").Json,
+            status: f.status,
+          })
+          .eq("id", f.id);
+        if (error) throw error;
+      } else {
+        // Insert new
+        const { error } = await supabase
+          .from("forms")
+          .insert({
+            id: f.id,
+            user_id: user.id,
+            title: f.title,
+            description: f.description ?? null,
+            questions: f.questions as unknown as import("@/integrations/supabase/types").Json,
+            settings: f.settings as unknown as import("@/integrations/supabase/types").Json,
+            status: f.status,
+          });
+        if (error) throw error;
+        // Navigate to edit mode with the new id
+        navigate(`/builder?id=${f.id}`, { replace: true });
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Save failed";
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  }, [user, formId, navigate]);
+
+  // ── Auto-save on form change (debounced) ───────────────────────────────────
+  const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    if (loading) return;
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
+    autoSaveRef.current = setTimeout(() => saveForm(form), 1500);
+    return () => { if (autoSaveRef.current) clearTimeout(autoSaveRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form]);
+
+  // ── AI suggestions ─────────────────────────────────────────────────────────
   const fetchSuggestions = useCallback(async (title: string) => {
     if (title.trim().length < 5) return;
     if (title === lastFetchedTitle) return;
-
     setLastFetchedTitle(title);
     setAiLoading(true);
     setAiError(null);
@@ -819,30 +852,18 @@ const FormBuilder = () => {
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/suggest-questions`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
+        headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
         body: JSON.stringify({ title }),
       });
-
       if (!res.ok) {
-        if (res.status === 429) {
-          setAiError("Rate limit reached. Try again in a moment.");
-        } else if (res.status === 402) {
-          setAiError("AI usage limit reached. Please add credits.");
-        } else {
-          setAiError("Could not load suggestions.");
-        }
+        if (res.status === 429) setAiError("Rate limit reached. Try again in a moment.");
+        else if (res.status === 402) setAiError("AI usage limit reached.");
+        else setAiError("Could not load suggestions.");
         setAiLoading(false);
         return;
       }
-
       const data = await res.json();
-      const suggestions: AISuggestion[] = (data.suggestions ?? []).filter(
-        (s: AISuggestion) => s.title && s.type
-      );
-      setAiSuggestions(suggestions);
+      setAiSuggestions((data.suggestions ?? []).filter((s: AISuggestion) => s.title && s.type));
     } catch {
       setAiError("Could not load suggestions.");
     } finally {
@@ -852,8 +873,7 @@ const FormBuilder = () => {
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
-    setForm({ ...form, title: val });
-
+    setForm((f) => ({ ...f, title: val }));
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (val.trim().length >= 5) {
       debounceRef.current = setTimeout(() => fetchSuggestions(val), 800);
@@ -863,92 +883,97 @@ const FormBuilder = () => {
     }
   };
 
-  useEffect(() => {
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, []);
+  useEffect(() => { return () => { if (debounceRef.current) clearTimeout(debounceRef.current); }; }, []);
 
   const addSuggestedQuestion = useCallback((s: AISuggestion) => {
     const q: Question = {
-      id: uid(),
-      type: s.type,
-      title: s.title,
-      required: s.required ?? false,
-      options: s.options
-        ? s.options.map((label) => ({ id: uid(), label }))
-        : (s.type === "multiple_choice" ? [{ id: uid(), label: "Option 1" }, { id: uid(), label: "Option 2" }] : undefined),
+      id: uid(), type: s.type, title: s.title, required: s.required ?? false,
+      options: s.options ? s.options.map((label) => ({ id: uid(), label })) : (s.type === "multiple_choice" ? [{ id: uid(), label: "Option 1" }, { id: uid(), label: "Option 2" }] : undefined),
       maxRating: s.type === "rating" ? 5 : undefined,
     };
-    const qs = [...form.questions, q];
-    setForm({ ...form, questions: qs });
-    setActiveIdx(qs.length - 1);
-    // Remove added suggestion
-    setAiSuggestions(prev => prev.filter(p => p.title !== s.title));
+    setForm((f) => {
+      const qs = [...f.questions, q];
+      setActiveIdx(qs.length - 1);
+      setAiSuggestions((prev) => prev.filter((p) => p.title !== s.title));
+      return { ...f, questions: qs };
+    });
     toast.success(`Added: "${s.title.slice(0, 40)}${s.title.length > 40 ? "…" : ""}"`);
-  }, [form]);
+  }, []);
 
   const addAllSuggestions = useCallback(() => {
     const newQs: Question[] = aiSuggestions.map((s) => ({
-      id: uid(),
-      type: s.type,
-      title: s.title,
-      required: s.required ?? false,
-      options: s.options
-        ? s.options.map((label) => ({ id: uid(), label }))
-        : (s.type === "multiple_choice" ? [{ id: uid(), label: "Option 1" }, { id: uid(), label: "Option 2" }] : undefined),
+      id: uid(), type: s.type, title: s.title, required: s.required ?? false,
+      options: s.options ? s.options.map((label) => ({ id: uid(), label })) : (s.type === "multiple_choice" ? [{ id: uid(), label: "Option 1" }, { id: uid(), label: "Option 2" }] : undefined),
       maxRating: s.type === "rating" ? 5 : undefined,
     }));
-    const qs = [...form.questions, ...newQs];
-    setForm({ ...form, questions: qs });
-    setActiveIdx(qs.length - 1);
+    setForm((f) => {
+      const qs = [...f.questions, ...newQs];
+      setActiveIdx(qs.length - 1);
+      return { ...f, questions: qs };
+    });
     setAiSuggestions([]);
     toast.success(`Added ${newQs.length} questions`);
-  }, [form, aiSuggestions]);
+  }, [aiSuggestions]);
 
   const updateQuestion = (idx: number, q: Question) => {
-    const qs = [...form.questions];
-    qs[idx] = q;
-    setForm({ ...form, questions: qs });
+    setForm((f) => { const qs = [...f.questions]; qs[idx] = q; return { ...f, questions: qs }; });
   };
 
   const addQuestion = (type: QuestionType) => {
     const q = defaultQuestion(type);
-    const qs = [...form.questions, q];
-    setForm({ ...form, questions: qs });
-    setActiveIdx(qs.length - 1);
+    setForm((f) => {
+      const qs = [...f.questions, q];
+      setActiveIdx(qs.length - 1);
+      return { ...f, questions: qs };
+    });
     setShowTypeMenu(false);
   };
 
   const deleteQuestion = (idx: number) => {
-    const qs = form.questions.filter((_, i) => i !== idx);
-    setForm({ ...form, questions: qs });
-    setActiveIdx(Math.max(0, idx - 1));
+    setForm((f) => {
+      const qs = f.questions.filter((_, i) => i !== idx);
+      setActiveIdx(Math.max(0, idx - 1));
+      return { ...f, questions: qs };
+    });
   };
 
   const moveQuestion = (from: number, to: number) => {
-    const qs = [...form.questions];
-    const [removed] = qs.splice(from, 1);
-    qs.splice(to, 0, removed);
-    setForm({ ...form, questions: qs });
-    setActiveIdx(to);
-  };
-
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setForm((f) => {
+      const qs = [...f.questions];
+      const [removed] = qs.splice(from, 1);
+      qs.splice(to, 0, removed);
+      setActiveIdx(to);
+      return { ...f, questions: qs };
+    });
   };
 
   const activeQuestion = form.questions[activeIdx];
   const showAiPanel = !aiDismissed && (aiLoading || aiSuggestions.length > 0 || aiError !== null);
 
+  const sidebarSharedProps = {
+    form, activeIdx, setActiveIdx, showTypeMenu, setShowTypeMenu,
+    moveQuestion, deleteQuestion, addQuestion,
+  };
+
+  const previewSharedProps = {
+    form, activeIdx, previewDevice, setPreviewDevice, setActivePanel, activePanel,
+  };
+
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <Loader2 size={24} className="animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
     <>
-      {showShareModal && (
-        <ShareModal form={form} onClose={() => setShowShareModal(false)} />
-      )}
+      {showShareModal && <ShareModal form={form} onClose={() => setShowShareModal(false)} />}
 
       <div className="h-screen flex flex-col bg-background overflow-hidden">
         {/* ── Top bar ── */}
-        <header className="h-14 border-b border-border bg-card flex items-center px-4 gap-4 shrink-0 z-40">
+        <header className="h-14 border-b border-border bg-card flex items-center px-3 md:px-4 gap-2 md:gap-4 shrink-0 z-40">
           <Link
             to="/dashboard"
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
@@ -957,7 +982,23 @@ const FormBuilder = () => {
             <span className="hidden sm:inline">Dashboard</span>
           </Link>
 
-          <div className="w-px h-5 bg-border shrink-0" />
+          <div className="w-px h-5 bg-border shrink-0 hidden sm:block" />
+
+          {/* Mobile: sidebar sheet trigger */}
+          {isMobile && (
+            <Sheet>
+              <SheetTrigger asChild>
+                <button className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground shrink-0">
+                  <Menu size={16} />
+                </button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-72 p-0 flex flex-col">
+                <div className="flex flex-col h-full">
+                  <QuestionSidebarContent {...sidebarSharedProps} />
+                </div>
+              </SheetContent>
+            </Sheet>
+          )}
 
           {/* Editable title */}
           <input
@@ -968,16 +1009,15 @@ const FormBuilder = () => {
             placeholder="Untitled form"
           />
 
-          {/* AI loading indicator in topbar */}
           {aiLoading && (
-            <div className="flex items-center gap-1.5 text-xs text-primary">
+            <div className="flex items-center gap-1.5 text-xs text-primary shrink-0">
               <Sparkles size={12} className="animate-pulse" />
-              <span className="hidden sm:inline">Generating suggestions…</span>
+              <span className="hidden md:inline">Generating…</span>
             </div>
           )}
 
-          <div className="ml-auto flex items-center gap-2">
-            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+          <div className="ml-auto flex items-center gap-1.5 md:gap-2">
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium hidden sm:inline-flex ${
               form.status === "active" ? "bg-green-50 text-green-700" :
               form.status === "closed" ? "bg-muted text-muted-foreground" :
               "bg-amber-50 text-amber-700"
@@ -989,25 +1029,40 @@ const FormBuilder = () => {
               href={`/f/${form.id}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-outline flex items-center gap-1.5 text-xs py-2 px-3"
+              className="btn-outline flex items-center gap-1.5 text-xs py-2 px-3 hidden sm:flex"
             >
               <Eye size={13} /> Preview
             </a>
 
+            {/* Mobile: preview sheet trigger */}
+            {isMobile && (
+              <Sheet>
+                <SheetTrigger asChild>
+                  <button className="flex items-center gap-1.5 text-xs py-2 px-3 rounded-lg border border-border hover:border-primary hover:text-primary transition-colors">
+                    <Layers size={13} />
+                  </button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-80 p-0 flex flex-col">
+                  <div className="flex flex-col h-full">
+                    <PreviewPanelContent {...previewSharedProps} />
+                  </div>
+                </SheetContent>
+              </Sheet>
+            )}
+
             <button
-              onClick={handleSave}
-              className={`flex items-center gap-1.5 text-xs py-2 px-4 rounded-lg font-semibold transition-all ${
-                saved
-                  ? "bg-green-600 text-white"
-                  : "btn-primary"
+              onClick={() => saveForm(form)}
+              disabled={saving}
+              className={`flex items-center gap-1.5 text-xs py-2 px-3 md:px-4 rounded-lg font-semibold transition-all ${
+                saved ? "bg-green-600 text-white" : "btn-primary"
               }`}
             >
-              {saved ? <><Check size={13} /> Saved</> : "Save"}
+              {saving ? <Loader2 size={13} className="animate-spin" /> : saved ? <><Check size={13} /> Saved</> : "Save"}
             </button>
 
             <button
               onClick={() => setShowShareModal(true)}
-              className="btn-primary flex items-center gap-1.5 text-xs py-2 px-4"
+              className="btn-primary flex items-center gap-1.5 text-xs py-2 px-3 md:px-4 hidden sm:flex"
             >
               <Share2 size={13} /> Share
             </button>
@@ -1017,82 +1072,22 @@ const FormBuilder = () => {
         {/* ── Body ── */}
         <div className="flex-1 flex overflow-hidden">
 
-          {/* ── Left: Question list ── */}
-          <aside className="w-64 border-r border-border bg-card flex flex-col shrink-0 overflow-hidden">
-            <div className="px-3 pt-3 pb-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1 mb-2">
-                Questions
-              </p>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-2 space-y-1">
-              {form.questions.length === 0 && (
-                <div className="text-center py-10 px-4">
-                  <p className="text-muted-foreground text-sm mb-1">No questions yet</p>
-                  <p className="text-muted-foreground text-xs">Add your first question below</p>
-                </div>
-              )}
-              {form.questions.map((q, idx) => (
-                <QuestionListItem
-                  key={q.id}
-                  question={q}
-                  index={idx}
-                  isActive={idx === activeIdx}
-                  onSelect={() => setActiveIdx(idx)}
-                  onMoveUp={() => moveQuestion(idx, idx - 1)}
-                  onMoveDown={() => moveQuestion(idx, idx + 1)}
-                  onDelete={() => deleteQuestion(idx)}
-                  canMoveUp={idx > 0}
-                  canMoveDown={idx < form.questions.length - 1}
-                />
-              ))}
-            </div>
-
-            {/* Add question button */}
-            <div className="p-3 border-t border-border relative">
-              <button
-                onClick={() => setShowTypeMenu(!showTypeMenu)}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/3 text-muted-foreground hover:text-primary text-sm font-medium transition-all"
-              >
-                <Plus size={15} />
-                Add question
-              </button>
-
-              {showTypeMenu && (
-                <div className="absolute bottom-full left-2 right-2 mb-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden z-50 max-h-80 overflow-y-auto">
-                  {QUESTION_TYPES.map((t) => {
-                    const TIcon = t.icon;
-                    return (
-                      <button
-                        key={t.type}
-                        onClick={() => addQuestion(t.type)}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/60 transition-colors text-left"
-                      >
-                        <TIcon size={14} className="text-primary shrink-0" />
-                        <div>
-                          <p className="text-sm font-medium">{t.label}</p>
-                          <p className="text-xs text-muted-foreground">{t.description}</p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </aside>
+          {/* ── Left: Question list (desktop only) ── */}
+          {!isMobile && (
+            <aside className="w-64 border-r border-border bg-card flex flex-col shrink-0 overflow-hidden">
+              <QuestionSidebarContent {...sidebarSharedProps} />
+            </aside>
+          )}
 
           {/* ── Center: Question editor ── */}
           <main className="flex-1 overflow-y-auto bg-background">
-            {/* Tab strip */}
-            <div className="border-b border-border px-6 flex gap-1 bg-card">
+            <div className="border-b border-border px-4 md:px-6 flex gap-1 bg-card">
               {(["editor", "settings"] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActivePanel(tab)}
                   className={`px-4 py-3 text-sm font-semibold capitalize border-b-2 transition-colors -mb-px ${
-                    activePanel === tab
-                      ? "border-primary text-primary"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
+                    activePanel === tab ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {tab === "editor" ? "Questions" : "Settings"}
@@ -1100,10 +1095,8 @@ const FormBuilder = () => {
               ))}
             </div>
 
-            {/* Questions editor */}
             {activePanel === "editor" && (
-              <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
-                {/* AI Suggestion Panel — shown below tab strip in editor */}
+              <div className="max-w-2xl mx-auto px-4 md:px-6 py-8 space-y-6">
                 {showAiPanel && (
                   <AISuggestionPanel
                     suggestions={aiSuggestions}
@@ -1147,8 +1140,7 @@ const FormBuilder = () => {
                             onClick={() => addQuestion(t.type)}
                             className="flex items-center gap-2 px-4 py-3 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/3 transition-all text-sm font-medium text-left"
                           >
-                            <TIcon size={14} className="text-primary" />
-                            {t.label}
+                            <TIcon size={14} className="text-primary" /> {t.label}
                           </button>
                         );
                       })}
@@ -1158,10 +1150,8 @@ const FormBuilder = () => {
               </div>
             )}
 
-            {/* Settings panel */}
             {activePanel === "settings" && (
-              <div className="max-w-2xl mx-auto px-6 py-8 space-y-8">
-                {/* Thank-you screen */}
+              <div className="max-w-2xl mx-auto px-4 md:px-6 py-8 space-y-8">
                 <section>
                   <h2 className="font-display font-semibold text-base mb-4">Thank-you screen</h2>
                   <div className="space-y-4">
@@ -1169,7 +1159,7 @@ const FormBuilder = () => {
                       <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Title</label>
                       <input
                         value={form.settings.thankYouTitle ?? ""}
-                        onChange={(e) => setForm({ ...form, settings: { ...form.settings, thankYouTitle: e.target.value } })}
+                        onChange={(e) => setForm((f) => ({ ...f, settings: { ...f.settings, thankYouTitle: e.target.value } }))}
                         placeholder="Thank you for your response!"
                         className="w-full px-4 py-3 rounded-xl border border-input bg-background text-foreground font-display font-semibold text-base focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                       />
@@ -1179,7 +1169,7 @@ const FormBuilder = () => {
                       <textarea
                         rows={3}
                         value={form.settings.thankYouMessage ?? ""}
-                        onChange={(e) => setForm({ ...form, settings: { ...form.settings, thankYouMessage: e.target.value } })}
+                        onChange={(e) => setForm((f) => ({ ...f, settings: { ...f.settings, thankYouMessage: e.target.value } }))}
                         placeholder="Your response has been recorded."
                         className="w-full px-4 py-3 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none"
                       />
@@ -1187,22 +1177,20 @@ const FormBuilder = () => {
                   </div>
                 </section>
 
-                {/* Redirect */}
                 <section className="border-t border-border pt-8">
                   <h2 className="font-display font-semibold text-base mb-1">Redirect after submit</h2>
-                  <p className="text-xs text-muted-foreground mb-4">Send respondents to a custom URL instead of the thank-you screen.</p>
+                  <p className="text-xs text-muted-foreground mb-4">Send respondents to a custom URL after submission.</p>
                   <input
                     value={form.settings.redirectUrl ?? ""}
-                    onChange={(e) => setForm({ ...form, settings: { ...form.settings, redirectUrl: e.target.value } })}
+                    onChange={(e) => setForm((f) => ({ ...f, settings: { ...f.settings, redirectUrl: e.target.value } }))}
                     placeholder="https://yoursite.com/thanks"
                     className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                   />
                 </section>
 
-                {/* Branding */}
                 <section className="border-t border-border pt-8">
                   <h2 className="font-display font-semibold text-base mb-1">Formqo branding</h2>
-                  <p className="text-xs text-muted-foreground mb-4">Show "Powered by Formqo" at the bottom of your form. Required on the Free plan.</p>
+                  <p className="text-xs text-muted-foreground mb-4">Show "Powered by Formqo" at the bottom of your form.</p>
                   <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-muted/20">
                     <div>
                       <p className="text-sm font-medium">Show Formqo badge</p>
@@ -1211,7 +1199,7 @@ const FormBuilder = () => {
                     <div className="flex items-center gap-3">
                       <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">Pro feature</span>
                       <div
-                        onClick={() => setForm({ ...form, settings: { ...form.settings, showBranding: !form.settings.showBranding } })}
+                        onClick={() => setForm((f) => ({ ...f, settings: { ...f.settings, showBranding: !f.settings.showBranding } }))}
                         className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${form.settings.showBranding ? "bg-primary" : "bg-border"}`}
                       >
                         <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${form.settings.showBranding ? "translate-x-4" : "translate-x-0.5"}`} />
@@ -1220,67 +1208,40 @@ const FormBuilder = () => {
                   </div>
                 </section>
 
-                {/* Notification email */}
                 <section className="border-t border-border pt-8">
-                  <h2 className="font-display font-semibold text-base mb-1">Notification email</h2>
-                  <p className="text-xs text-muted-foreground mb-4">
-                    Get an email each time someone submits. Also configurable in{" "}
-                    <a href="/dashboard/integrations" className="text-primary hover:underline">Integrations</a>.
-                  </p>
-                  <input
-                    type="email"
-                    placeholder="you@company.com"
-                    className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                  />
+                  <h2 className="font-display font-semibold text-base mb-1">Form status</h2>
+                  <p className="text-xs text-muted-foreground mb-4">Control whether this form is accepting new responses.</p>
+                  <div className="flex gap-2">
+                    {(["draft", "active", "closed"] as const).map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setForm((f) => ({ ...f, status: s }))}
+                        className={`px-4 py-2 rounded-lg border text-sm font-semibold capitalize transition-colors ${
+                          form.status === s ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
                 </section>
 
                 <div className="border-t border-border pt-6">
-                  <button onClick={handleSave} className="btn-primary text-sm">Save settings</button>
+                  <button onClick={() => saveForm(form)} disabled={saving} className="btn-primary text-sm flex items-center gap-2">
+                    {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                    Save settings
+                  </button>
                 </div>
               </div>
             )}
           </main>
 
-          {/* ── Right: Live preview ── */}
-          <aside className="w-80 border-l border-border bg-muted/20 flex flex-col shrink-0">
-            {/* Device toggle */}
-            <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-border">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Preview</p>
-              <div className="flex gap-1 bg-muted rounded-lg p-0.5">
-                <button
-                  onClick={() => setPreviewDevice("mobile")}
-                  className={`p-1.5 rounded-md transition-colors ${previewDevice === "mobile" ? "bg-card shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                >
-                  <Smartphone size={13} />
-                </button>
-                <button
-                  onClick={() => setPreviewDevice("desktop")}
-                  className={`p-1.5 rounded-md transition-colors ${previewDevice === "desktop" ? "bg-card shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                >
-                  <Monitor size={13} />
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-4 py-4 flex items-start justify-center">
-              <LivePreview form={form} activeIdx={activeIdx} device={previewDevice} />
-            </div>
-
-            {/* Panel switcher */}
-            <div className="border-t border-border px-4 py-3 flex items-center gap-2 text-xs">
-              <button
-                onClick={() => setActivePanel("settings")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors font-medium ${
-                  activePanel === "settings" ? "bg-primary/8 text-primary" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Settings size={12} /> Settings
-              </button>
-              <span className="ml-auto text-muted-foreground">
-                {form.questions.length} Q
-              </span>
-            </div>
-          </aside>
+          {/* ── Right: Live preview (desktop only, wider) ── */}
+          {!isMobile && (
+            <aside className="w-96 xl:w-[440px] border-l border-border bg-muted/20 flex flex-col shrink-0">
+              <PreviewPanelContent {...previewSharedProps} />
+            </aside>
+          )}
         </div>
       </div>
     </>
