@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import Logo from "@/components/Logo";
 
 interface NavbarProps {
   variant?: "default" | "dashboard";
@@ -24,9 +25,7 @@ const Navbar = ({ variant = "default", userRole }: NavbarProps) => {
   if (variant === "dashboard") {
     return (
       <nav className="h-14 border-b border-border bg-background flex items-center px-6 justify-between">
-        <Link to="/" className="flex items-center gap-2">
-          <span className="font-display font-bold text-xl text-primary">Formqo</span>
-        </Link>
+        <Logo height={22} />
         <div className="flex items-center gap-4">
           {userRole === "admin" && (
             <Link to="/admin" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
@@ -53,12 +52,7 @@ const Navbar = ({ variant = "default", userRole }: NavbarProps) => {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
       <div className="container mx-auto flex items-center justify-between h-16 px-4">
-        <Link to="/" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-display font-bold text-sm">F</span>
-          </div>
-          <span className="font-display font-bold text-lg text-foreground">Formqo</span>
-        </Link>
+        <Logo height={26} />
 
         {/* Desktop nav */}
         <div className="hidden md:flex items-center gap-8">

@@ -1,0 +1,24 @@
+import { Link } from "react-router-dom";
+import formqoLogo from "@/assets/formqo-logo.png";
+
+interface LogoProps {
+  /** Height of the logo image in px (default 28) */
+  height?: number;
+  /** Extra classes on the wrapping anchor */
+  className?: string;
+  /** Invert to white — use on dark/primary-coloured backgrounds */
+  invert?: boolean;
+}
+
+const Logo = ({ height = 28, className = "", invert = false }: LogoProps) => (
+  <Link to="/" className={`inline-flex items-center ${className}`}>
+    <img
+      src={formqoLogo}
+      alt="Formqo"
+      style={{ height, width: "auto" }}
+      className={invert ? "brightness-0 invert" : "brightness-0"}
+    />
+  </Link>
+);
+
+export default Logo;

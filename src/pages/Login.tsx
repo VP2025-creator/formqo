@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import Logo from "@/components/Logo";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -28,12 +29,7 @@ const Login = () => {
     <div className="min-h-screen flex">
       {/* Left panel */}
       <div className="hidden lg:flex lg:w-1/2 bg-primary flex-col justify-between p-12">
-        <Link to="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-md bg-primary-foreground/20 flex items-center justify-center">
-            <span className="text-primary-foreground font-display font-bold">F</span>
-          </div>
-          <span className="font-display font-bold text-xl text-primary-foreground">Formqo</span>
-        </Link>
+        <Logo height={28} invert className="mb-0" />
         <div>
           <blockquote className="text-primary-foreground text-2xl font-display font-medium leading-relaxed mb-6">
             "Formqo transformed how we collect user research. The AI suggestions alone are worth the subscription."
@@ -53,12 +49,7 @@ const Login = () => {
       {/* Right panel */}
       <div className="flex-1 flex flex-col justify-center px-6 py-12 lg:px-16">
         <div className="w-full max-w-md mx-auto">
-          <Link to="/" className="flex items-center gap-2 mb-10 lg:hidden">
-            <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-display font-bold text-sm">F</span>
-            </div>
-            <span className="font-display font-bold text-lg">Formqo</span>
-          </Link>
+          <Logo height={24} className="mb-10 lg:hidden" />
           <div className="mb-8">
             <h1 className="font-display font-bold text-3xl text-foreground mb-2">Welcome back</h1>
             <p className="text-muted-foreground text-sm">Sign in to your Formqo account</p>
