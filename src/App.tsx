@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import Layout from "@/components/Layout";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -29,21 +30,25 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            <Route path="/" element={<Index />} />
+            {/* Pages WITHOUT the shared footer */}
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/builder" element={<FormBuilder />} />
             <Route path="/f/:formId" element={<FormRenderer />} />
-            <Route path="/forms/:formId/responses" element={<FormResponses />} />
-            <Route path="/forms/:formId/analytics" element={<FormAnalytics />} />
-            <Route path="/dashboard/integrations" element={<Integrations />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/templates" element={<Templates />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
+
+            {/* Pages WITH the shared footer */}
+            <Route element={<Layout />}>
+              <Route path="/" element={<Index />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/forms/:formId/responses" element={<FormResponses />} />
+              <Route path="/forms/:formId/analytics" element={<FormAnalytics />} />
+              <Route path="/dashboard/integrations" element={<Integrations />} />
+              <Route path="/pricing" element={<Pricing />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/templates" element={<Templates />} />
+              <Route path="*" element={<NotFound />} />
+            </Route>
           </Routes>
         </AuthProvider>
       </BrowserRouter>
