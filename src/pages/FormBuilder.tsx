@@ -3,7 +3,7 @@ import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import {
   Plus, Trash2, GripVertical, ChevronDown, Eye,
   AlignLeft, AlignJustify, List, Star, Mail, ToggleLeft,
-  Hash, Calendar, ChevronRight, ChevronUp, ArrowLeft,
+  Hash, Calendar, ChevronRight, ChevronUp, ArrowLeft, ArrowRight,
   Settings, Share2, Check, X, MoreHorizontal, Smartphone, Monitor,
   Sparkles, Loader2, Copy, Code2, Link2, QrCode, Menu, Layers, FileText,
   Phone, Globe, MapPin, CheckSquare, Scale, BarChart3, Gauge, ArrowUpDown, Image,
@@ -656,8 +656,12 @@ function WelcomeImageUploader({
 
 // ─── Live Preview ─────────────────────────────────────────────────────────────
 
+// activeIdx: -1 = welcome, 0..N-1 = questions, N = thank you
 function LivePreview({ form, activeIdx, device }: { form: Form; activeIdx: number; device: "mobile" | "desktop" }) {
-  const q = form.questions[activeIdx];
+  const hasWelcome = !!form.settings.welcomeScreen?.enabled;
+  const isWelcome = activeIdx === -1 && hasWelcome;
+  const isThankYou = activeIdx === form.questions.length;
+  const q = !isWelcome && !isThankYou ? form.questions[activeIdx] : null;
 
   const isDesktop = device === "desktop";
 
@@ -668,6 +672,18 @@ function LivePreview({ form, activeIdx, device }: { form: Form; activeIdx: numbe
   const frameClasses = isDesktop
     ? "w-full aspect-video rounded-xl border border-border overflow-hidden shadow-2xl"
     : "w-[320px] h-[580px] rounded-[2.5rem] border-[6px] border-foreground/80 overflow-hidden shadow-2xl";
+
+  const ws = form.settings.welcomeScreen;
+
+  // Convert YouTube watch URLs to embed
+  const getEmbedUrl = (url: string) => {
+    if (!url) return "";
+    const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/);
+    if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+    const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+    if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+    return url;
+  };
 
   return (
     <div className={`flex items-center justify-center ${outerClasses}`}>
@@ -689,12 +705,60 @@ function LivePreview({ form, activeIdx, device }: { form: Form; activeIdx: numbe
         )}
 
         <div className={`w-full ${isDesktop ? "h-[calc(100%-36px)]" : "h-full"} overflow-y-auto flex flex-col`} style={{ background: "hsl(var(--foreground))", fontFamily: "'Inter', sans-serif" }}>
-          {/* Progress bar */}
-          <div className="w-full h-0.5 bg-white/10 shrink-0">
-            <div className="h-full bg-white transition-all" style={{ width: `${((activeIdx + 1) / Math.max(form.questions.length, 1)) * 100}%` }} />
-          </div>
+          {/* Progress bar (only on questions) */}
+          {!isWelcome && !isThankYou && (
+            <div className="w-full h-0.5 bg-white/10 shrink-0">
+              <div className="h-full bg-white transition-all" style={{ width: `${((activeIdx + 1) / Math.max(form.questions.length, 1)) * 100}%` }} />
+            </div>
+          )}
 
           <div className={`flex-1 flex flex-col justify-center ${isDesktop ? "px-16 py-12 max-w-2xl mx-auto w-full" : "p-6"}`}>
+            {/* ── Welcome Screen ── */}
+            {isWelcome && (
+              <>
+                <p className={`text-white/40 uppercase tracking-widest mb-4 font-body ${isDesktop ? "text-xs" : "text-[10px]"}`}>
+                  {form.questions.length} questions · ~2 min
+                </p>
+                <h3 className={`font-display font-bold text-white leading-tight mb-3 ${isDesktop ? "text-2xl" : "text-lg"}`}>
+                  {ws?.title || form.title || <span className="opacity-30 italic font-normal">Welcome title</span>}
+                </h3>
+                {(ws?.description || form.description) && (
+                  <p className={`text-white/50 mb-5 leading-relaxed ${isDesktop ? "text-sm" : "text-xs"}`}>
+                    {ws?.description || form.description}
+                  </p>
+                )}
+                {ws?.imageUrl && (
+                  <div className={`mb-4 rounded-lg overflow-hidden ${isDesktop ? "max-w-xs" : "max-w-[200px]"}`}>
+                    <img src={ws.imageUrl} alt="Welcome" className="w-full h-auto object-cover rounded-lg" />
+                  </div>
+                )}
+                {ws?.videoUrl && (
+                  <div className={`mb-4 rounded-lg overflow-hidden aspect-video ${isDesktop ? "max-w-xs" : "max-w-[200px]"}`}>
+                    <iframe src={getEmbedUrl(ws.videoUrl)} title="Welcome video" className="w-full h-full rounded-lg" allowFullScreen />
+                  </div>
+                )}
+                <button className={`self-start flex items-center gap-2 bg-white text-foreground rounded-lg font-semibold ${isDesktop ? "px-5 py-2.5 text-sm" : "px-4 py-2 text-xs"}`}>
+                  {ws?.buttonText || "Start"} <ArrowRight size={isDesktop ? 12 : 10} />
+                </button>
+              </>
+            )}
+
+            {/* ── Thank You Screen ── */}
+            {isThankYou && (
+              <>
+                <div className={`rounded-full bg-white/15 flex items-center justify-center mb-6 ${isDesktop ? "w-12 h-12" : "w-10 h-10"}`}>
+                  <Check size={isDesktop ? 20 : 16} className="text-white" />
+                </div>
+                <h3 className={`font-display font-bold text-white leading-tight mb-3 ${isDesktop ? "text-2xl" : "text-lg"}`}>
+                  {form.settings.thankYouTitle || "Thank you!"}
+                </h3>
+                <p className={`text-white/50 ${isDesktop ? "text-sm" : "text-xs"}`}>
+                  {form.settings.thankYouMessage || "Your response has been recorded."}
+                </p>
+              </>
+            )}
+
+            {/* ── Question Screen ── */}
             {q ? (
               <>
                 <p className={`text-white/40 mb-4 font-body ${isDesktop ? "text-sm" : "text-xs"}`}>
@@ -749,9 +813,9 @@ function LivePreview({ form, activeIdx, device }: { form: Form; activeIdx: numbe
                   OK <ArrowLeft size={isDesktop ? 12 : 10} className="rotate-180" />
                 </button>
               </>
-            ) : (
+            ) : !isWelcome && !isThankYou ? (
               <div className="text-center text-white/30"><p className={isDesktop ? "text-base" : "text-sm"}>No questions yet</p></div>
-            )}
+            ) : null}
           </div>
 
           <div className="flex justify-center pb-3">
@@ -1629,7 +1693,17 @@ const FormBuilder = () => {
               <div className="flex-1 overflow-y-auto flex items-center justify-center p-8">
                 <LivePreview form={form} activeIdx={activeIdx} device={previewDevice} />
               </div>
-              <div className="flex justify-center gap-2 pb-4">
+              <div className="flex justify-center items-center gap-2 pb-4">
+                {/* Welcome dot */}
+                {form.settings.welcomeScreen?.enabled && (
+                  <button
+                    onClick={() => setActiveIdx(-1)}
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${activeIdx === -1 ? "bg-primary text-primary-foreground" : "bg-border text-muted-foreground hover:bg-muted-foreground/30"}`}
+                  >
+                    Welcome
+                  </button>
+                )}
+                {/* Question dots */}
                 {form.questions.map((_, i) => (
                   <button
                     key={i}
@@ -1637,6 +1711,13 @@ const FormBuilder = () => {
                     className={`w-2 h-2 rounded-full transition-colors ${i === activeIdx ? "bg-primary" : "bg-border hover:bg-muted-foreground/30"}`}
                   />
                 ))}
+                {/* Thank you dot */}
+                <button
+                  onClick={() => setActiveIdx(form.questions.length)}
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${activeIdx === form.questions.length ? "bg-primary text-primary-foreground" : "bg-border text-muted-foreground hover:bg-muted-foreground/30"}`}
+                >
+                  End
+                </button>
               </div>
             </div>
           )}
