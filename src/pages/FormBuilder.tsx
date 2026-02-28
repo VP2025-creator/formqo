@@ -6,6 +6,8 @@ import {
   Hash, Calendar, ChevronRight, ChevronUp, ArrowLeft,
   Settings, Share2, Check, X, MoreHorizontal, Smartphone, Monitor,
   Sparkles, Loader2, Copy, Code2, Link2, QrCode, Menu, Layers, FileText,
+  Phone, Globe, MapPin, CheckSquare, Scale, BarChart3, Gauge, ArrowUpDown, Image,
+  PlayCircle, Upload,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Question, QuestionType, Form, QuestionOption } from "@/types/form";
@@ -30,28 +32,45 @@ function getEmbedSnippet(formId: string) {
 
 // ─── Question type config ────────────────────────────────────────────────────
 
-const QUESTION_TYPES: { type: QuestionType; label: string; icon: React.ElementType; description: string }[] = [
-  { type: "short_text",      label: "Short text",      icon: AlignLeft,    description: "Single line answer" },
-  { type: "long_text",       label: "Long text",       icon: AlignJustify, description: "Multi-line answer" },
-  { type: "multiple_choice", label: "Multiple choice", icon: List,         description: "Select from options" },
-  { type: "rating",          label: "Rating",          icon: Star,         description: "1–5 or 1–10 scale" },
-  { type: "email",           label: "Email",           icon: Mail,         description: "Email address" },
-  { type: "yes_no",          label: "Yes / No",        icon: ToggleLeft,   description: "Boolean choice" },
-  { type: "number",          label: "Number",          icon: Hash,         description: "Numeric input" },
-  { type: "date",            label: "Date",            icon: Calendar,     description: "Date picker" },
+// ─── Question type categories (matching Tally-style layout) ──────────────────
+
+interface QuestionTypeConfig {
+  type: QuestionType;
+  label: string;
+  icon: React.ElementType;
+  description: string;
+  category: "Contact info" | "Choice" | "Rating & ranking" | "Text & Video" | "Other";
+}
+
+const QUESTION_TYPES: QuestionTypeConfig[] = [
+  // Contact info
+  { type: "email",           label: "Email",           icon: Mail,         description: "Email address",        category: "Contact info" },
+  { type: "phone",           label: "Phone Number",    icon: Phone,        description: "Phone number input",   category: "Contact info" },
+  { type: "address",         label: "Address",         icon: MapPin,       description: "Full address",         category: "Contact info" },
+  { type: "website",         label: "Website",         icon: Globe,        description: "URL input",            category: "Contact info" },
+  // Choice
+  { type: "multiple_choice", label: "Multiple Choice", icon: List,         description: "Select from options",  category: "Choice" },
+  { type: "dropdown",        label: "Dropdown",        icon: ChevronDown,  description: "Dropdown select",      category: "Choice" },
+  { type: "picture_choice",  label: "Picture Choice",  icon: Image,        description: "Choose with images",   category: "Choice" },
+  { type: "yes_no",          label: "Yes / No",        icon: ToggleLeft,   description: "Boolean choice",       category: "Choice" },
+  { type: "legal",           label: "Legal",           icon: Scale,        description: "Terms acceptance",      category: "Choice" },
+  { type: "checkbox",        label: "Checkbox",        icon: CheckSquare,  description: "Multi-select checks",  category: "Choice" },
+  // Rating & ranking
+  { type: "nps",             label: "Net Promoter Score", icon: Gauge,     description: "NPS 0–10 scale",       category: "Rating & ranking" },
+  { type: "opinion_scale",   label: "Opinion Scale",   icon: BarChart3,    description: "Likert-style scale",   category: "Rating & ranking" },
+  { type: "rating",          label: "Rating",          icon: Star,         description: "1–5 or 1–10 scale",    category: "Rating & ranking" },
+  { type: "ranking",         label: "Ranking",         icon: ArrowUpDown,  description: "Order items by pref",  category: "Rating & ranking" },
+  // Text & Video
+  { type: "long_text",       label: "Long Text",       icon: AlignJustify, description: "Multi-line answer",    category: "Text & Video" },
+  { type: "short_text",      label: "Short Text",      icon: AlignLeft,    description: "Single line answer",   category: "Text & Video" },
+  // Other
+  { type: "number",          label: "Number",          icon: Hash,         description: "Numeric input",        category: "Other" },
+  { type: "date",            label: "Date",            icon: Calendar,     description: "Date picker",          category: "Other" },
 ];
 
-const TYPE_ICONS: Record<QuestionType, React.ElementType> = {
-  short_text: AlignLeft,
-  long_text: AlignJustify,
-  multiple_choice: List,
-  rating: Star,
-  email: Mail,
-  yes_no: ToggleLeft,
-  number: Hash,
-  date: Calendar,
-  dropdown: List,
-};
+const TYPE_ICONS: Record<QuestionType, React.ElementType> = Object.fromEntries(
+  QUESTION_TYPES.map((t) => [t.type, t.icon])
+) as Record<QuestionType, React.ElementType>;
 
 function uid() {
   return Math.random().toString(36).slice(2, 9);
@@ -64,14 +83,17 @@ function defaultQuestion(type: QuestionType): Question {
     title: "",
     required: false,
   };
-  if (type === "multiple_choice" || type === "dropdown") {
+  if (["multiple_choice", "dropdown", "checkbox", "picture_choice", "ranking"].includes(type)) {
     base.options = [
       { id: uid(), label: "Option 1" },
       { id: uid(), label: "Option 2" },
     ];
   }
   if (type === "rating") base.maxRating = 5;
-  if (type === "multiple_choice") base.allowMultiple = false;
+  if (type === "multiple_choice" || type === "checkbox" || type === "picture_choice") base.allowMultiple = false;
+  if (type === "opinion_scale") { base.scaleMax = 5; base.scaleLabels = { start: "Disagree", end: "Agree" }; }
+  if (type === "nps") { base.scaleMax = 10; base.scaleLabels = { start: "Not likely", end: "Very likely" }; }
+  if (type === "legal") base.title = "I agree to the terms and conditions";
   return base;
 }
 
@@ -382,7 +404,7 @@ function QuestionEditor({ question, index, onChange }: { question: Question; ind
         />
       </div>
 
-      {["short_text", "long_text", "email", "number"].includes(question.type) && (
+      {["short_text", "long_text", "email", "number", "phone", "website", "address"].includes(question.type) && (
         <div>
           <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Placeholder</label>
           <input
@@ -394,11 +416,11 @@ function QuestionEditor({ question, index, onChange }: { question: Question; ind
         </div>
       )}
 
-      {(question.type === "multiple_choice" || question.type === "dropdown") && question.options && (
+      {["multiple_choice", "dropdown", "checkbox", "picture_choice", "ranking"].includes(question.type) && question.options && (
         <div>
           <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Options</label>
           <OptionsEditor options={question.options} onChange={(opts) => update({ options: opts })} />
-          {question.type === "multiple_choice" && (
+          {["multiple_choice", "checkbox", "picture_choice"].includes(question.type) && (
             <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
               <div
                 onClick={() => update({ allowMultiple: !question.allowMultiple })}
@@ -409,6 +431,47 @@ function QuestionEditor({ question, index, onChange }: { question: Question; ind
               <span className="text-sm text-foreground">Allow multiple selections</span>
             </label>
           )}
+        </div>
+      )}
+
+      {(question.type === "opinion_scale" || question.type === "nps") && (
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Scale max</label>
+            <div className="flex gap-2">
+              {(question.type === "nps" ? [10] : [3, 5, 7, 10]).map((n) => (
+                <button
+                  key={n}
+                  onClick={() => update({ scaleMax: n })}
+                  className={`px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${
+                    question.scaleMax === n ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Start label</label>
+              <input
+                value={question.scaleLabels?.start ?? ""}
+                onChange={(e) => update({ scaleLabels: { ...question.scaleLabels, start: e.target.value } })}
+                placeholder="e.g. Disagree"
+                className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">End label</label>
+              <input
+                value={question.scaleLabels?.end ?? ""}
+                onChange={(e) => update({ scaleLabels: { ...question.scaleLabels, end: e.target.value } })}
+                placeholder="e.g. Agree"
+                className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+              />
+            </div>
+          </div>
         </div>
       )}
 
@@ -1206,40 +1269,30 @@ const FormBuilder = () => {
                     {/* Divider */}
                     <div className="h-px bg-border mb-10" />
 
-                    {/* Question type blocks */}
-                    <div className="grid grid-cols-2 gap-x-12 gap-y-1">
-                      <div>
-                        <h4 className="font-display font-semibold text-sm mb-3">Question types</h4>
-                        {QUESTION_TYPES.slice(0, 4).map((t) => {
-                          const TIcon = t.icon;
-                          return (
-                            <button
-                              key={t.type}
-                              onClick={() => addQuestion(t.type)}
-                              className="flex items-center gap-3 w-full py-2 text-muted-foreground hover:text-foreground transition-colors group"
-                            >
-                              <TIcon size={15} className="text-muted-foreground/60 group-hover:text-foreground/70" />
-                              <span className="text-sm">{t.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <div>
-                        <h4 className="font-display font-semibold text-sm mb-3">More types</h4>
-                        {QUESTION_TYPES.slice(4).map((t) => {
-                          const TIcon = t.icon;
-                          return (
-                            <button
-                              key={t.type}
-                              onClick={() => addQuestion(t.type)}
-                              className="flex items-center gap-3 w-full py-2 text-muted-foreground hover:text-foreground transition-colors group"
-                            >
-                              <TIcon size={15} className="text-muted-foreground/60 group-hover:text-foreground/70" />
-                              <span className="text-sm">{t.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
+                    {/* Question type blocks — categorized */}
+                    <div className="grid grid-cols-3 gap-x-10 gap-y-8">
+                      {(["Contact info", "Choice", "Rating & ranking", "Text & Video", "Other"] as const).map((cat) => {
+                        const items = QUESTION_TYPES.filter((t) => t.category === cat);
+                        if (items.length === 0) return null;
+                        return (
+                          <div key={cat}>
+                            <h4 className="font-display font-semibold text-xs uppercase tracking-wide text-muted-foreground mb-3">{cat}</h4>
+                            {items.map((t) => {
+                              const TIcon = t.icon;
+                              return (
+                                <button
+                                  key={t.type}
+                                  onClick={() => addQuestion(t.type)}
+                                  className="flex items-center gap-3 w-full py-2 text-muted-foreground hover:text-foreground transition-colors group"
+                                >
+                                  <TIcon size={15} className="text-muted-foreground/60 group-hover:text-foreground/70" />
+                                  <span className="text-sm">{t.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1248,7 +1301,84 @@ const FormBuilder = () => {
 
             {activePanel === "settings" && (
               <div className="max-w-2xl mx-auto px-4 md:px-6 py-8 space-y-8">
+                {/* Welcome / Opening screen */}
                 <section>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-display font-semibold text-base">Welcome screen</h2>
+                    <div
+                      onClick={() => setForm((f) => ({
+                        ...f,
+                        settings: {
+                          ...f.settings,
+                          welcomeScreen: {
+                            ...f.settings.welcomeScreen,
+                            enabled: !f.settings.welcomeScreen?.enabled,
+                          },
+                        },
+                      }))}
+                      className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${form.settings.welcomeScreen?.enabled ? "bg-primary" : "bg-border"}`}
+                    >
+                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${form.settings.welcomeScreen?.enabled ? "translate-x-4" : "translate-x-0.5"}`} />
+                    </div>
+                  </div>
+                  {form.settings.welcomeScreen?.enabled && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Title</label>
+                        <input
+                          value={form.settings.welcomeScreen?.title ?? ""}
+                          onChange={(e) => setForm((f) => ({ ...f, settings: { ...f.settings, welcomeScreen: { ...f.settings.welcomeScreen, enabled: true, title: e.target.value } } }))}
+                          placeholder="Welcome! We'd love your feedback"
+                          className="w-full px-4 py-3 rounded-xl border border-input bg-background text-foreground font-display font-semibold text-base focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Description</label>
+                        <textarea
+                          rows={3}
+                          value={form.settings.welcomeScreen?.description ?? ""}
+                          onChange={(e) => setForm((f) => ({ ...f, settings: { ...f.settings, welcomeScreen: { ...f.settings.welcomeScreen, enabled: true, description: e.target.value } } }))}
+                          placeholder="Introduce your form and let people know what to expect..."
+                          className="w-full px-4 py-3 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Image URL <span className="font-normal normal-case">(optional)</span></label>
+                        <input
+                          value={form.settings.welcomeScreen?.imageUrl ?? ""}
+                          onChange={(e) => setForm((f) => ({ ...f, settings: { ...f.settings, welcomeScreen: { ...f.settings.welcomeScreen, enabled: true, imageUrl: e.target.value } } }))}
+                          placeholder="https://example.com/hero.jpg"
+                          className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+                          Video embed URL <span className="font-normal normal-case">(YouTube / Vimeo)</span>
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <PlayCircle size={16} className="text-muted-foreground shrink-0" />
+                          <input
+                            value={form.settings.welcomeScreen?.videoUrl ?? ""}
+                            onChange={(e) => setForm((f) => ({ ...f, settings: { ...f.settings, welcomeScreen: { ...f.settings.welcomeScreen, enabled: true, videoUrl: e.target.value } } }))}
+                            placeholder="https://youtube.com/embed/..."
+                            className="flex-1 px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Button text</label>
+                        <input
+                          value={form.settings.welcomeScreen?.buttonText ?? ""}
+                          onChange={(e) => setForm((f) => ({ ...f, settings: { ...f.settings, welcomeScreen: { ...f.settings.welcomeScreen, enabled: true, buttonText: e.target.value } } }))}
+                          placeholder="Start"
+                          className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </section>
+
+                <section className="border-t border-border pt-8">
                   <h2 className="font-display font-semibold text-base mb-4">Thank-you screen</h2>
                   <div className="space-y-4">
                     <div>
@@ -1271,17 +1401,6 @@ const FormBuilder = () => {
                       />
                     </div>
                   </div>
-                </section>
-
-                <section className="border-t border-border pt-8">
-                  <h2 className="font-display font-semibold text-base mb-1">Redirect after submit</h2>
-                  <p className="text-xs text-muted-foreground mb-4">Send respondents to a custom URL after submission.</p>
-                  <input
-                    value={form.settings.redirectUrl ?? ""}
-                    onChange={(e) => setForm((f) => ({ ...f, settings: { ...f.settings, redirectUrl: e.target.value } }))}
-                    placeholder="https://yoursite.com/thanks"
-                    className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                  />
                 </section>
 
                 <section className="border-t border-border pt-8">
