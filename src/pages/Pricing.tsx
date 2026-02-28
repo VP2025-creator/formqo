@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+
 import { Check, Minus, Zap, ArrowRight, Sparkles } from "lucide-react";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
@@ -369,7 +369,7 @@ const Pricing = () => {
         </div>
       </section>
 
-      <Footer />
+      
     </div>
   );
 };

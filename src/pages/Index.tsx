@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+
 import heroForm from "@/assets/hero-form.jpg";
 import {
   Sparkles, Zap, BarChart3, Shield, Globe, Webhook,
@@ -402,7 +402,7 @@ const Index = () => {
         </div>
       </section>
 
-      <Footer />
+      
     </div>
   );
 };

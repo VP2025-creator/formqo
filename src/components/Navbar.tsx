@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
-import { Menu, X, ChevronDown, Settings, LayoutDashboard, LogOut, ShieldCheck } from "lucide-react";
+import { Menu, X, ChevronDown, Settings, LayoutDashboard, LogOut, ShieldCheck, Home } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import Logo from "@/components/Logo";
@@ -76,6 +76,14 @@ function UserMenu({ userRole, onSignOut }: { userRole?: string; onSignOut: () =>
             <p className="text-xs font-semibold text-foreground truncate">{displayName}</p>
             <p className="text-[11px] text-muted-foreground truncate mt-0.5">{user?.email}</p>
           </div>
+
+          <Link
+            to="/"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+          >
+            <Home size={14} className="text-muted-foreground" /> Homepage
+          </Link>
 
           {userRole === "admin" && (
             <Link
