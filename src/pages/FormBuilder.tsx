@@ -5,7 +5,7 @@ import {
   AlignLeft, AlignJustify, List, Star, Mail, ToggleLeft,
   Hash, Calendar, ChevronRight, ChevronUp, ArrowLeft,
   Settings, Share2, Check, X, MoreHorizontal, Smartphone, Monitor,
-  Sparkles, Loader2, Copy, Code2, Link2, QrCode, Menu, Layers,
+  Sparkles, Loader2, Copy, Code2, Link2, QrCode, Menu, Layers, FileText,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Question, QuestionType, Form, QuestionOption } from "@/types/form";
@@ -1169,45 +1169,78 @@ const FormBuilder = () => {
                     />
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-16 text-center px-8">
-                    <div className="w-16 h-16 rounded-2xl bg-primary/8 flex items-center justify-center mb-5">
-                      <Plus size={24} className="text-primary" />
+                  <div className="max-w-2xl mx-auto py-12 px-6">
+                    {/* Editable form title */}
+                    <input
+                      value={form.title}
+                      onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                      placeholder="Form title"
+                      className="w-full text-4xl font-display font-bold text-foreground placeholder:text-muted-foreground/40 bg-transparent border-none outline-none mb-8"
+                    />
+
+                    {/* Quick-start actions */}
+                    <div className="space-y-2 mb-10">
+                      <button
+                        onClick={() => addQuestion("short_text")}
+                        className="flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors py-1.5 group"
+                      >
+                        <FileText size={16} className="text-muted-foreground/60 group-hover:text-foreground/70" />
+                        <span className="text-sm">Press Enter to start from scratch</span>
+                      </button>
+                      <Link
+                        to="/templates"
+                        className="flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors py-1.5 group"
+                      >
+                        <Layers size={16} className="text-muted-foreground/60 group-hover:text-foreground/70" />
+                        <span className="text-sm">Use a template</span>
+                      </Link>
+                      <button
+                        onClick={() => setShowAIChat(true)}
+                        className="flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors py-1.5 group"
+                      >
+                        <Sparkles size={16} className="text-primary/60 group-hover:text-primary" />
+                        <span className="text-sm">Build with FormqoAI</span>
+                      </button>
                     </div>
-                    <h2 className="font-display font-bold text-xl text-foreground mb-2">Add your first question</h2>
-                    <p className="text-muted-foreground text-sm mb-6 max-w-xs">Choose a question type to get started.</p>
-                    <div className="grid grid-cols-2 gap-2 max-w-sm mb-10">
-                      {QUESTION_TYPES.slice(0, 6).map((t) => {
-                        const TIcon = t.icon;
-                        return (
-                          <button
-                            key={t.type}
-                            onClick={() => addQuestion(t.type)}
-                            className="flex items-center gap-2 px-4 py-3 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/3 transition-all text-sm font-medium text-left"
-                          >
-                            <TIcon size={14} className="text-primary" /> {t.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div className="flex items-center gap-4 w-full max-w-sm mb-10">
-                      <div className="flex-1 h-px bg-border" />
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">or</span>
-                      <div className="flex-1 h-px bg-border" />
-                    </div>
-                    <button
-                      onClick={() => setShowAIChat(true)}
-                      className="group relative w-full max-w-sm rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary/60 bg-primary/3 hover:bg-primary/5 transition-all px-6 py-6"
-                    >
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Sparkles size={22} className="text-primary" />
-                        </div>
-                        <div>
-                          <h3 className="font-display font-bold text-base text-foreground mb-1">Build with FormqoAI</h3>
-                          <p className="text-xs text-muted-foreground">Describe your form in plain English and we'll build it for you.</p>
-                        </div>
+
+                    {/* Divider */}
+                    <div className="h-px bg-border mb-10" />
+
+                    {/* Question type blocks */}
+                    <div className="grid grid-cols-2 gap-x-12 gap-y-1">
+                      <div>
+                        <h4 className="font-display font-semibold text-sm mb-3">Question types</h4>
+                        {QUESTION_TYPES.slice(0, 4).map((t) => {
+                          const TIcon = t.icon;
+                          return (
+                            <button
+                              key={t.type}
+                              onClick={() => addQuestion(t.type)}
+                              className="flex items-center gap-3 w-full py-2 text-muted-foreground hover:text-foreground transition-colors group"
+                            >
+                              <TIcon size={15} className="text-muted-foreground/60 group-hover:text-foreground/70" />
+                              <span className="text-sm">{t.label}</span>
+                            </button>
+                          );
+                        })}
                       </div>
-                    </button>
+                      <div>
+                        <h4 className="font-display font-semibold text-sm mb-3">More types</h4>
+                        {QUESTION_TYPES.slice(4).map((t) => {
+                          const TIcon = t.icon;
+                          return (
+                            <button
+                              key={t.type}
+                              onClick={() => addQuestion(t.type)}
+                              className="flex items-center gap-3 w-full py-2 text-muted-foreground hover:text-foreground transition-colors group"
+                            >
+                              <TIcon size={15} className="text-muted-foreground/60 group-hover:text-foreground/70" />
+                              <span className="text-sm">{t.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
