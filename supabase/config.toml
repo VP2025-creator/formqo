@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.issue-csrf]
 verify_jwt = false
+
+[functions.build-form-ai]
+verify_jwt = false
