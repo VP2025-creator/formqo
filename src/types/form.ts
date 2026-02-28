@@ -16,7 +16,8 @@ export type QuestionType =
   | "opinion_scale"
   | "nps"
   | "ranking"
-  | "picture_choice";
+  | "picture_choice"
+  | "file_upload";
 
 export interface QuestionOption {
   id: string;
@@ -36,6 +37,8 @@ export interface Question {
   allowMultiple?: boolean;      // multiple_choice, checkbox, picture_choice
   scaleMax?: number;            // opinion_scale, nps
   scaleLabels?: { start?: string; end?: string }; // opinion_scale, nps
+  maxFileSize?: number;         // file_upload (in MB, default 10)
+  acceptedFileTypes?: string[]; // file_upload (e.g. [".pdf", ".docx"])
 }
 
 export interface WelcomeScreen {
