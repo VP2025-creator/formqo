@@ -12,6 +12,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import FormRenderer from "./pages/FormRenderer";
 import FormBuilder from "./pages/FormBuilder";
 import FormResponses from "./pages/FormResponses";
+import FormAnalytics from "./pages/FormAnalytics";
 import Integrations from "./pages/Integrations";
 import Pricing from "./pages/Pricing";
 import Settings from "./pages/Settings";
@@ -36,6 +37,7 @@ const App = () => (
             <Route path="/builder" element={<FormBuilder />} />
             <Route path="/f/:formId" element={<FormRenderer />} />
             <Route path="/forms/:formId/responses" element={<FormResponses />} />
+            <Route path="/forms/:formId/analytics" element={<FormAnalytics />} />
             <Route path="/dashboard/integrations" element={<Integrations />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/settings" element={<Settings />} />
