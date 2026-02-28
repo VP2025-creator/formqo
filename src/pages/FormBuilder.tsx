@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile.tsx";
+import FormqoAIChat from "@/components/FormqoAIChat";
 
 // ─── Formqo subdomain constants ──────────────────────────────────────────────
 const SHARE_BASE = "https://share.formqo.com/f";
@@ -452,7 +453,7 @@ function LivePreview({ form, activeIdx, device }: { form: Form; activeIdx: numbe
 
   const containerClasses = device === "mobile"
     ? "w-[320px] h-[580px] rounded-[2.5rem] border-[6px] border-foreground/80 overflow-hidden shadow-2xl"
-    : "w-full h-[520px] rounded-2xl border border-border overflow-hidden shadow-lg";
+    : "w-full max-w-[900px] h-[560px] rounded-2xl border border-border overflow-hidden shadow-lg";
 
   return (
     <div className={`flex items-center justify-center ${device === "mobile" ? "py-4" : ""}`}>
@@ -737,6 +738,8 @@ const FormBuilder = () => {
   const [showTypeMenu, setShowTypeMenu] = useState(false);
   const [activePanel, setActivePanel] = useState<"editor" | "settings">("editor");
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showAIChat, setShowAIChat] = useState(false);
+  const [showPreviewOverlay, setShowPreviewOverlay] = useState(false);
 
   // AI suggestion state
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
@@ -1031,14 +1034,12 @@ const FormBuilder = () => {
               {form.status}
             </span>
 
-            <a
-              href={`/f/${form.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={() => setShowPreviewOverlay(true)}
               className="btn-outline flex items-center gap-1.5 text-xs py-2 px-3 hidden sm:flex"
             >
               <Eye size={13} /> Preview
-            </a>
+            </button>
 
             {/* Mobile: preview sheet trigger */}
             {isMobile && (
@@ -1120,24 +1121,30 @@ const FormBuilder = () => {
                     index={activeIdx}
                     onChange={(q) => updateQuestion(activeIdx, q)}
                   />
+                ) : showAIChat ? (
+                  <div className="h-[600px]">
+                    <FormqoAIChat
+                      onApplyForm={(result) => {
+                        setForm((f) => ({
+                          ...f,
+                          title: result.title,
+                          description: result.description,
+                          questions: result.questions,
+                        }));
+                        setActiveIdx(0);
+                        setShowAIChat(false);
+                        toast.success(`Form created with ${result.questions.length} questions`);
+                      }}
+                    />
+                  </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-20 text-center px-8">
+                  <div className="flex flex-col items-center justify-center py-16 text-center px-8">
                     <div className="w-16 h-16 rounded-2xl bg-primary/8 flex items-center justify-center mb-5">
                       <Plus size={24} className="text-primary" />
                     </div>
                     <h2 className="font-display font-bold text-xl text-foreground mb-2">Add your first question</h2>
-                    <p className="text-muted-foreground text-sm mb-2 max-w-xs">
-                      Choose a question type from the sidebar, or let AI suggest questions based on your form title.
-                    </p>
-                    {!aiLoading && aiSuggestions.length === 0 && form.title.trim().length >= 5 && (
-                      <button
-                        onClick={() => fetchSuggestions(form.title)}
-                        className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 font-medium mb-6 transition-colors"
-                      >
-                        <Sparkles size={12} /> Suggest questions with AI
-                      </button>
-                    )}
-                    <div className="grid grid-cols-2 gap-2 max-w-sm">
+                    <p className="text-muted-foreground text-sm mb-6 max-w-xs">Choose a question type to get started.</p>
+                    <div className="grid grid-cols-2 gap-2 max-w-sm mb-10">
                       {QUESTION_TYPES.slice(0, 6).map((t) => {
                         const TIcon = t.icon;
                         return (
@@ -1151,6 +1158,25 @@ const FormBuilder = () => {
                         );
                       })}
                     </div>
+                    <div className="flex items-center gap-4 w-full max-w-sm mb-10">
+                      <div className="flex-1 h-px bg-border" />
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">or</span>
+                      <div className="flex-1 h-px bg-border" />
+                    </div>
+                    <button
+                      onClick={() => setShowAIChat(true)}
+                      className="group relative w-full max-w-sm rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary/60 bg-primary/3 hover:bg-primary/5 transition-all px-6 py-6"
+                    >
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Sparkles size={22} className="text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-display font-bold text-base text-foreground mb-1">Build with FormqoAI</h3>
+                          <p className="text-xs text-muted-foreground">Describe your form in plain English and we'll build it for you.</p>
+                        </div>
+                      </div>
+                    </button>
                   </div>
                 )}
               </div>
@@ -1242,11 +1268,50 @@ const FormBuilder = () => {
             )}
           </main>
 
-          {/* ── Right: Live preview (desktop only, wider) ── */}
-          {!isMobile && (
-            <aside className="w-96 xl:w-[440px] border-l border-border bg-muted/20 flex flex-col shrink-0">
-              <PreviewPanelContent {...previewSharedProps} />
-            </aside>
+          {/* ── Full-screen preview overlay ── */}
+          {showPreviewOverlay && (
+            <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card shrink-0">
+                <div className="flex items-center gap-3">
+                  <p className="font-display font-semibold text-sm text-foreground">Preview</p>
+                  <span className="text-xs text-muted-foreground">{form.title}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-1 bg-muted rounded-lg p-0.5">
+                    <button
+                      onClick={() => setPreviewDevice("mobile")}
+                      className={`p-1.5 rounded-md transition-colors ${previewDevice === "mobile" ? "bg-card shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      <Smartphone size={13} />
+                    </button>
+                    <button
+                      onClick={() => setPreviewDevice("desktop")}
+                      className={`p-1.5 rounded-md transition-colors ${previewDevice === "desktop" ? "bg-card shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      <Monitor size={13} />
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setShowPreviewOverlay(false)}
+                    className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto flex items-center justify-center p-8">
+                <LivePreview form={form} activeIdx={activeIdx} device={previewDevice} />
+              </div>
+              <div className="flex justify-center gap-2 pb-4">
+                {form.questions.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveIdx(i)}
+                    className={`w-2 h-2 rounded-full transition-colors ${i === activeIdx ? "bg-primary" : "bg-border hover:bg-muted-foreground/30"}`}
+                  />
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </div>
