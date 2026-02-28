@@ -34,6 +34,15 @@ const QUESTION_TYPE_LABELS: Record<string, string> = {
   number: "Number",
   date: "Date",
   dropdown: "Dropdown",
+  phone: "Phone number",
+  website: "Website",
+  address: "Address",
+  checkbox: "Checkbox",
+  legal: "Legal",
+  opinion_scale: "Opinion scale",
+  nps: "Net Promoter Score",
+  ranking: "Ranking",
+  picture_choice: "Picture choice",
 };
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -313,6 +322,178 @@ function QuestionScreen({
             onChange={(v) => onChange({ questionId: question.id, value: v })}
           />
         )}
+
+        {/* Phone */}
+        {question.type === "phone" && (
+          <input
+            autoFocus
+            type="tel"
+            placeholder={question.placeholder || "+1 (555) 000-0000"}
+            value={String(value?.value ?? "")}
+            onChange={(e) => onChange({ questionId: question.id, value: e.target.value })}
+            className={inputClasses}
+          />
+        )}
+
+        {/* Website */}
+        {question.type === "website" && (
+          <input
+            autoFocus
+            type="url"
+            placeholder={question.placeholder || "https://example.com"}
+            value={String(value?.value ?? "")}
+            onChange={(e) => onChange({ questionId: question.id, value: e.target.value })}
+            className={inputClasses}
+          />
+        )}
+
+        {/* Address */}
+        {question.type === "address" && (
+          <textarea
+            autoFocus
+            rows={3}
+            placeholder={question.placeholder || "Street, City, State, ZIP"}
+            value={String(value?.value ?? "")}
+            onChange={(e) => onChange({ questionId: question.id, value: e.target.value })}
+            className={`${inputClasses} resize-none border-2 rounded-xl p-4 border-white/30 focus:border-white`}
+          />
+        )}
+
+        {/* Checkbox (multi-select like multiple_choice) */}
+        {question.type === "checkbox" && question.options && (
+          <MultipleChoiceInput
+            options={question.options}
+            allowMultiple={true}
+            value={(value?.value as string[]) ?? []}
+            onChange={(v) => onChange({ questionId: question.id, value: v })}
+          />
+        )}
+
+        {/* Dropdown */}
+        {question.type === "dropdown" && question.options && (
+          <div className="space-y-2 w-full max-w-lg">
+            {question.options.map((opt) => {
+              const selected = value?.value === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => onChange({ questionId: question.id, value: opt.id })}
+                  className={`w-full flex items-center gap-4 px-5 py-4 rounded-xl border-2 text-left transition-all duration-150 ${
+                    selected
+                      ? "border-white bg-white text-foreground"
+                      : "border-white/25 bg-white/8 text-white hover:border-white/50 hover:bg-white/12"
+                  }`}
+                >
+                  <span className="font-medium">{opt.label}</span>
+                  {selected && <Check size={16} className="ml-auto" />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Legal (accept / decline) */}
+        {question.type === "legal" && (
+          <div className="flex gap-4">
+            {["Accept", "Decline"].map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => onChange({ questionId: question.id, value: opt })}
+                className={`flex items-center gap-3 px-8 py-4 rounded-xl border-2 font-semibold text-lg transition-all duration-150 ${
+                  value?.value === opt
+                    ? "border-white bg-white text-foreground"
+                    : "border-white/25 bg-white/8 text-white hover:border-white/50"
+                }`}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Opinion Scale */}
+        {question.type === "opinion_scale" && (
+          <div>
+            <div className="flex gap-2 flex-wrap">
+              {Array.from({ length: question.scaleMax ?? 5 }, (_, i) => i + 1).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => onChange({ questionId: question.id, value: n })}
+                  className={`w-14 h-14 rounded-xl text-xl font-bold border-2 transition-all duration-150 ${
+                    value?.value === n
+                      ? "border-white bg-white text-foreground scale-110"
+                      : "border-white/30 bg-white/10 text-white hover:border-white/60"
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            {question.scaleLabels && (
+              <div className="flex justify-between mt-2 text-white/40 text-xs font-body max-w-lg">
+                <span>{question.scaleLabels.start}</span>
+                <span>{question.scaleLabels.end}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* NPS */}
+        {question.type === "nps" && (
+          <div>
+            <div className="flex gap-2 flex-wrap">
+              {Array.from({ length: 11 }, (_, i) => i).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => onChange({ questionId: question.id, value: n })}
+                  className={`w-12 h-12 rounded-xl text-lg font-bold border-2 transition-all duration-150 ${
+                    value?.value === n
+                      ? "border-white bg-white text-foreground scale-110"
+                      : "border-white/30 bg-white/10 text-white hover:border-white/60"
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-between mt-2 text-white/40 text-xs font-body">
+              <span>{question.scaleLabels?.start ?? "Not likely"}</span>
+              <span>{question.scaleLabels?.end ?? "Very likely"}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Ranking */}
+        {question.type === "ranking" && question.options && (
+          <div className="space-y-2 w-full max-w-lg">
+            <p className="text-white/40 text-xs mb-2 font-body">Drag to reorder (click to select order)</p>
+            {question.options.map((opt, idx) => (
+              <div
+                key={opt.id}
+                className="flex items-center gap-4 px-5 py-4 rounded-xl border-2 border-white/25 bg-white/8 text-white"
+              >
+                <span className="w-7 h-7 rounded-md border-2 border-white/40 flex items-center justify-center text-xs font-bold text-white/60">
+                  {idx + 1}
+                </span>
+                <span className="font-medium">{opt.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Picture choice */}
+        {question.type === "picture_choice" && question.options && (
+          <MultipleChoiceInput
+            options={question.options}
+            allowMultiple={question.allowMultiple ?? false}
+            value={(value?.value as string[]) ?? []}
+            onChange={(v) => onChange({ questionId: question.id, value: v })}
+          />
+        )}
       </div>
 
       {/* Controls */}
@@ -355,6 +536,21 @@ function QuestionScreen({
 // ─── Welcome Screen ──────────────────────────────────────────────────────────
 
 function WelcomeScreen({ form, onStart, isPreview }: { form: Form; onStart: () => void; isPreview: boolean }) {
+  const ws = form.settings.welcomeScreen;
+  const title = ws?.title || form.title;
+  const description = ws?.description || form.description;
+  const buttonText = ws?.buttonText || "Start";
+
+  // Convert YouTube watch URLs to embed
+  const getEmbedUrl = (url: string) => {
+    if (!url) return "";
+    const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/);
+    if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+    const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+    if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+    return url; // assume already an embed URL
+  };
+
   return (
     <div className="animate-fade-up min-h-screen flex flex-col justify-center px-8 md:px-16 lg:px-24">
       {isPreview && (
@@ -367,18 +563,44 @@ function WelcomeScreen({ form, onStart, isPreview }: { form: Form; onStart: () =
           {form.questions.length} questions · ~2 min
         </p>
         <h1 className="font-display text-4xl md:text-6xl font-bold text-white leading-tight mb-4">
-          {form.title}
+          {title}
         </h1>
-        {form.description && (
-          <p className="text-white/55 text-lg md:text-xl font-body mb-10 leading-relaxed">
-            {form.description}
+        {description && (
+          <p className="text-white/55 text-lg md:text-xl font-body mb-8 leading-relaxed">
+            {description}
           </p>
         )}
+
+        {/* Welcome image */}
+        {ws?.imageUrl && (
+          <div className="mb-8 rounded-xl overflow-hidden max-w-lg">
+            <img
+              src={ws.imageUrl}
+              alt="Welcome"
+              className="w-full h-auto object-cover rounded-xl"
+              loading="lazy"
+            />
+          </div>
+        )}
+
+        {/* Embedded video */}
+        {ws?.videoUrl && (
+          <div className="mb-8 rounded-xl overflow-hidden max-w-lg aspect-video">
+            <iframe
+              src={getEmbedUrl(ws.videoUrl)}
+              title="Welcome video"
+              className="w-full h-full rounded-xl"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        )}
+
         <button
           onClick={onStart}
           className="flex items-center gap-2 bg-white text-foreground px-8 py-4 rounded-xl font-semibold text-base hover:bg-white/90 hover:scale-105 transition-all duration-200 font-display"
         >
-          Start <ArrowRight size={16} />
+          {buttonText} <ArrowRight size={16} />
         </button>
         <p className="mt-4 text-white/25 text-xs font-body">
           press <kbd className="text-white/40 font-semibold">Enter ↵</kbd> to begin
