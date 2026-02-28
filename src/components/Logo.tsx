@@ -8,11 +8,13 @@ interface LogoProps {
   className?: string;
   /** Invert to white — use on dark/primary-coloured backgrounds */
   invert?: boolean;
+  /** Override link target (default "/") */
+  to?: string;
 }
 
-const Logo = ({ height = 28, className = "", invert = false }: LogoProps) => (
+const Logo = ({ height = 28, className = "", invert = false, to = "/" }: LogoProps) => (
   <div className={className}>
-    <Link to="/" className="inline-flex items-center">
+    <Link to={to} className="inline-flex items-center">
       <img
         src={formqoLogo}
         alt="Formqo"
