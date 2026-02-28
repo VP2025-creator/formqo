@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Plus, BarChart3, Eye, MoreHorizontal, Zap, Users,
   TrendingUp, FileText, Clock, ChevronRight, Pencil, Puzzle,
-  ArrowRight, Loader2, Trash2, Link2, Copy, Search, X,
+  ArrowRight, Loader2, Trash2, Link2, Copy, Search, X, PieChart,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -388,6 +388,11 @@ const Dashboard = () => {
                           <DropdownMenuItem asChild>
                             <Link to={`/forms/${form.id}/responses`} className="flex items-center gap-2">
                               <BarChart3 size={13} /> Results
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link to={`/forms/${form.id}/analytics`} className="flex items-center gap-2">
+                              <PieChart size={13} /> Analytics
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem
