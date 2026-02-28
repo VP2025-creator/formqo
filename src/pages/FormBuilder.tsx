@@ -1185,7 +1185,7 @@ const FormBuilder = () => {
                         className="flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors py-1.5 group"
                       >
                         <FileText size={16} className="text-muted-foreground/60 group-hover:text-foreground/70" />
-                        <span className="text-sm">Press Enter to start from scratch</span>
+                        <span className="text-sm">Start from scratch</span>
                       </button>
                       <Link
                         to="/templates"
