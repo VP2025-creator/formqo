@@ -132,7 +132,7 @@ const Navbar = ({ variant = "default", userRole }: NavbarProps) => {
   if (variant === "dashboard") {
     return (
       <nav className="h-14 border-b border-border bg-background flex items-center px-6 justify-between">
-        <Logo height={22} />
+        <Logo height={22} to="/dashboard" />
         <UserMenu userRole={userRole} onSignOut={handleSignOut} />
       </nav>
     );
