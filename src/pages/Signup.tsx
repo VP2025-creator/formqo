@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { Eye, EyeOff, ArrowRight, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -45,6 +46,14 @@ const Signup = () => {
 
   return (
     <div className="min-h-screen flex">
+      <Helmet>
+        <title>Create Account — Formqo | Free AI Form Builder</title>
+        <meta name="description" content="Create your free Formqo account. Build beautiful AI-powered forms in minutes. No credit card required." />
+        <link rel="canonical" href="https://formqo.lovable.app/signup" />
+        <meta property="og:title" content="Create Account — Formqo | Free AI Form Builder" />
+        <meta property="og:description" content="Create your free Formqo account. Build beautiful AI-powered forms in minutes." />
+        <meta name="robots" content="index, follow" />
+      </Helmet>
       <div className="hidden lg:flex lg:w-1/2 bg-foreground flex-col justify-between p-12">
         <Logo height={28} invert className="mb-0" />
         <div>

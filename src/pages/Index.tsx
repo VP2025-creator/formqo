@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import Navbar from "@/components/Navbar";
 
 import heroForm from "@/assets/hero-form.jpg";
@@ -127,9 +128,71 @@ const testimonials = [
   },
 ];
 
+const faqItems = [
+  { q: "What is Formqo?", a: "Formqo is an AI-powered form builder that lets you create beautiful, conversational forms in minutes. Collect better data, understand your users, and automate workflows — all from one place." },
+  { q: "Is Formqo free to use?", a: "Yes! Formqo offers a free forever plan with up to 3 forms and 100 responses per month. No credit card required." },
+  { q: "What AI features does Formqo offer?", a: "Formqo's AI can generate smart questions based on your goal, auto-detect the best input type, create logic branching without coding, and perform sentiment analysis on responses. Available on Pro and Business plans." },
+  { q: "What integrations does Formqo support?", a: "Formqo integrates with Slack, Zapier, Webhooks, HubSpot, Notion, Airtable, Google Sheets, Mailchimp, and more. New integrations are added every month." },
+  { q: "How much does Formqo cost?", a: "Formqo Free is £0/month. Pro is £19/month (£15/month billed annually) with unlimited forms and AI features. Business is £49/month (£39/month billed annually) with team collaboration and enterprise security." },
+  { q: "Can I remove Formqo branding from my forms?", a: "Yes, Formqo branding can be removed on Pro and Business plans. You can also use a custom domain." },
+  { q: "Is Formqo secure?", a: "Yes. Formqo is SOC 2 compliant with data encrypted at rest and in transit. Business plans include SSO, SAML, audit logs, and SLA guarantees." },
+  { q: "Does Formqo support file uploads?", a: "Yes, respondents can upload files including documents, images, and more. File upload questions are available on Pro and Business plans." },
+];
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqItems.map((item) => ({
+    "@type": "Question",
+    name: item.q,
+    acceptedAnswer: { "@type": "Answer", text: item.a },
+  })),
+};
+
+const orgJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "Formqo",
+  url: "https://formqo.lovable.app",
+  logo: "https://formqo.lovable.app/favicon.ico",
+  description: "AI-powered form builder for modern teams. Build stunning, conversational forms in minutes.",
+  sameAs: [],
+};
+
+const softwareJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Formqo",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  offers: [
+    { "@type": "Offer", price: "0", priceCurrency: "GBP", name: "Free" },
+    { "@type": "Offer", price: "19", priceCurrency: "GBP", name: "Pro" },
+    { "@type": "Offer", price: "49", priceCurrency: "GBP", name: "Business" },
+  ],
+  aggregateRating: { "@type": "AggregateRating", ratingValue: "5", reviewCount: "3" },
+};
+
 const Index = () => {
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Formqo | AI-Powered Form Builder — Create Beautiful Forms Free</title>
+        <meta name="description" content="Build stunning, conversational forms in minutes with Formqo's AI-powered form builder. Collect better data, understand your users, and automate workflows. Free forever, no credit card required." />
+        <link rel="canonical" href="https://formqo.lovable.app/" />
+        <meta property="og:title" content="Formqo | AI-Powered Form Builder — Create Beautiful Forms Free" />
+        <meta property="og:description" content="Build stunning, conversational forms in minutes with Formqo's AI-powered form builder. Collect better data, understand your users, and automate workflows." />
+        <meta property="og:url" content="https://formqo.lovable.app/" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Formqo | AI-Powered Form Builder — Create Beautiful Forms Free" />
+        <meta name="twitter:description" content="Build stunning, conversational forms in minutes with Formqo's AI-powered form builder. Free forever." />
+        <meta name="keywords" content="form builder, AI forms, online forms, survey maker, conversational forms, data collection, Formqo" />
+        <meta name="robots" content="index, follow" />
+        <script type="application/ld+json">{JSON.stringify(faqJsonLd)}</script>
+        <script type="application/ld+json">{JSON.stringify(orgJsonLd)}</script>
+        <script type="application/ld+json">{JSON.stringify(softwareJsonLd)}</script>
+      </Helmet>
       <Navbar />
 
       {/* Hero */}
@@ -381,6 +444,29 @@ const Index = () => {
           <p className="text-center text-xs text-muted-foreground mt-8">
             All plans include a 14-day free trial · Cancel anytime
           </p>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section id="faq" className="py-24 px-4 bg-muted/30">
+        <div className="container mx-auto max-w-4xl">
+          <div className="text-center mb-16">
+            <p className="section-tag mb-3">FAQ</p>
+            <h2 className="font-display font-bold text-4xl md:text-5xl text-foreground">
+              Frequently asked questions
+            </h2>
+            <p className="text-muted-foreground text-lg mt-4">
+              Everything you need to know about Formqo.
+            </p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-x-10 gap-y-8">
+            {faqItems.map((item) => (
+              <div key={item.q}>
+                <h3 className="font-display font-semibold text-base text-foreground mb-2">{item.q}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{item.a}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 

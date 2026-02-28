@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import Navbar from "@/components/Navbar";
 
 import { Check, Minus, Zap, ArrowRight, Sparkles } from "lucide-react";
-import { usePageMeta } from "@/hooks/use-page-meta";
 
 const features = [
   // Category: Forms
@@ -97,22 +97,40 @@ function FeatureCell({ value }: { value: boolean | string }) {
   return <span className="text-sm font-medium text-foreground">{value}</span>;
 }
 
+const pricingFaqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    { q: "Can I change plans later?", a: "Yes — upgrade, downgrade or cancel anytime. Changes take effect at the next billing cycle." },
+    { q: "What happens when I hit the response limit?", a: "New submissions are paused and you're notified. Your existing data is always safe." },
+    { q: "Is there a free trial on paid plans?", a: "Yes! Every paid plan includes a 14-day free trial — no credit card required." },
+    { q: "Do you offer discounts for nonprofits or education?", a: "Yes. Contact us at hello@formqo.com and we'll set you up with a discounted plan." },
+  ].map((item) => ({
+    "@type": "Question",
+    name: item.q,
+    acceptedAnswer: { "@type": "Answer", text: item.a },
+  })),
+};
+
 const Pricing = () => {
   const [annual, setAnnual] = useState(false);
-
-  usePageMeta({
-    title: "Pricing — Formqo | Simple, Honest Plans",
-    description: "Start free. Upgrade to Pro for £15/mo or Business for £39/mo. Unlock unlimited forms, AI question generation, and custom domains.",
-    ogImage: "https://formqo.lovable.app/og-pricing.png",
-    ogType: "website",
-    twitterCard: "summary_large_image",
-  });
-
 
   const categories = [...new Set(features.map((f) => f.category))];
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Pricing — Formqo | Simple, Honest Plans from £0/month</title>
+        <meta name="description" content="Formqo pricing: Free forever at £0/mo, Pro at £19/mo with unlimited forms & AI, Business at £49/mo for teams. 14-day free trial, no credit card required." />
+        <link rel="canonical" href="https://formqo.lovable.app/pricing" />
+        <meta property="og:title" content="Pricing — Formqo | Simple, Honest Plans from £0/month" />
+        <meta property="og:description" content="Start free. Upgrade to Pro or Business for unlimited forms, AI features, and team collaboration." />
+        <meta property="og:url" content="https://formqo.lovable.app/pricing" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Pricing — Formqo | Simple, Honest Plans" />
+        <meta name="robots" content="index, follow" />
+        <script type="application/ld+json">{JSON.stringify(pricingFaqJsonLd)}</script>
+      </Helmet>
       <Navbar />
 
       {/* Hero */}

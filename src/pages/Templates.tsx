@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import Navbar from "@/components/Navbar";
 
 import {
@@ -280,6 +281,14 @@ const Templates = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Form Templates — Formqo | Free Professional Templates</title>
+        <meta name="description" content="Browse 10+ professionally crafted form templates for feedback, research, HR, events, and lead generation. Clone and customise in seconds — free." />
+        <link rel="canonical" href="https://formqo.lovable.app/templates" />
+        <meta property="og:title" content="Form Templates — Formqo | Free Professional Templates" />
+        <meta property="og:description" content="Browse 10+ professionally crafted form templates. Clone and customise in seconds — free." />
+        <meta name="robots" content="index, follow" />
+      </Helmet>
       <Navbar />
 
       {/* Hero */}
