@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { ArrowRight, ArrowLeft, ArrowUp, ArrowDown, Check, Loader2 } from "lucide-react";
+import { ArrowRight, ArrowLeft, ArrowUp, ArrowDown, Check, Loader2, Upload, X } from "lucide-react";
 import { Form, Question, FormResponse } from "@/types/form";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -43,6 +43,7 @@ const QUESTION_TYPE_LABELS: Record<string, string> = {
   nps: "Net Promoter Score",
   ranking: "Ranking",
   picture_choice: "Picture choice",
+  file_upload: "File upload",
 };
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -162,6 +163,113 @@ function YesNoInput({ value, onChange }: { value: string | null; onChange: (v: s
           {opt}
         </button>
       ))}
+    </div>
+  );
+}
+
+// ─── File Upload Input ───────────────────────────────────────────────────────
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+
+function FileUploadInput({
+  question,
+  value,
+  onChange,
+  formId,
+}: {
+  question: Question;
+  value: string;
+  onChange: (url: string) => void;
+  formId: string;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const maxSize = (question.maxFileSize ?? 10) * 1024 * 1024; // MB to bytes
+  const acceptedTypes = question.acceptedFileTypes?.join(",") ?? "";
+
+  const handleFile = async (file: File) => {
+    setError(null);
+
+    if (file.size > maxSize) {
+      setError(`File too large. Max ${question.maxFileSize ?? 10} MB.`);
+      return;
+    }
+
+    if (question.acceptedFileTypes && question.acceptedFileTypes.length > 0) {
+      const ext = "." + file.name.split(".").pop()?.toLowerCase();
+      if (!question.acceptedFileTypes.some((t) => t.toLowerCase() === ext)) {
+        setError(`File type not accepted. Allowed: ${question.acceptedFileTypes.join(", ")}`);
+        return;
+      }
+    }
+
+    setUploading(true);
+    const path = `responses/${formId}/${Date.now()}-${file.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from("form-uploads")
+      .upload(path, file, { upsert: true });
+
+    if (uploadError) {
+      setError("Upload failed. Please try again.");
+      setUploading(false);
+      return;
+    }
+
+    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/form-uploads/${path}`;
+    setFileName(file.name);
+    onChange(publicUrl);
+    setUploading(false);
+  };
+
+  return (
+    <div className="w-full max-w-lg">
+      <input
+        ref={inputRef}
+        type="file"
+        accept={acceptedTypes}
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFile(file);
+        }}
+      />
+      {!value ? (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="w-full flex flex-col items-center justify-center gap-3 px-6 py-10 rounded-xl border-2 border-dashed border-white/30 bg-white/5 hover:border-white/50 hover:bg-white/10 transition-all text-white/60"
+        >
+          {uploading ? (
+            <Loader2 size={24} className="animate-spin text-white/50" />
+          ) : (
+            <Upload size={24} className="text-white/40" />
+          )}
+          <span className="text-sm font-medium">
+            {uploading ? "Uploading..." : "Click to upload a file"}
+          </span>
+          <span className="text-xs text-white/30">
+            Max {question.maxFileSize ?? 10} MB
+            {question.acceptedFileTypes?.length ? ` · ${question.acceptedFileTypes.join(", ")}` : ""}
+          </span>
+        </button>
+      ) : (
+        <div className="flex items-center gap-3 px-5 py-4 rounded-xl border-2 border-white bg-white/10">
+          <Check size={18} className="text-white shrink-0" />
+          <span className="text-sm text-white font-medium truncate flex-1">{fileName || "File uploaded"}</span>
+          <button
+            type="button"
+            onClick={() => { onChange(""); setFileName(null); }}
+            className="text-white/40 hover:text-white transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+      {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
     </div>
   );
 }
@@ -492,6 +600,16 @@ function QuestionScreen({
             allowMultiple={question.allowMultiple ?? false}
             value={(value?.value as string[]) ?? []}
             onChange={(v) => onChange({ questionId: question.id, value: v })}
+          />
+        )}
+
+        {/* File upload */}
+        {question.type === "file_upload" && (
+          <FileUploadInput
+            question={question}
+            value={value?.value as string ?? ""}
+            onChange={(url) => onChange({ questionId: question.id, value: url })}
+            formId={question.id}
           />
         )}
       </div>

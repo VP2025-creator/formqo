@@ -66,6 +66,7 @@ const QUESTION_TYPES: QuestionTypeConfig[] = [
   // Other
   { type: "number",          label: "Number",          icon: Hash,         description: "Numeric input",        category: "Other" },
   { type: "date",            label: "Date",            icon: Calendar,     description: "Date picker",          category: "Other" },
+  { type: "file_upload",     label: "File Upload",     icon: Upload,       description: "Attach files",         category: "Other" },
 ];
 
 const TYPE_ICONS: Record<QuestionType, React.ElementType> = Object.fromEntries(
@@ -94,6 +95,10 @@ function defaultQuestion(type: QuestionType): Question {
   if (type === "opinion_scale") { base.scaleMax = 5; base.scaleLabels = { start: "Disagree", end: "Agree" }; }
   if (type === "nps") { base.scaleMax = 10; base.scaleLabels = { start: "Not likely", end: "Very likely" }; }
   if (type === "legal") base.title = "I agree to the terms and conditions";
+  if (type === "file_upload") {
+    base.maxFileSize = 10;
+    base.acceptedFileTypes = [".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png", ".webp"];
+  }
   return base;
 }
 
@@ -494,6 +499,37 @@ function QuestionEditor({ question, index, onChange }: { question: Question; ind
         </div>
       )}
 
+      {question.type === "file_upload" && (
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Max file size (MB)</label>
+            <div className="flex gap-2">
+              {[2, 5, 10, 25].map((n) => (
+                <button
+                  key={n}
+                  onClick={() => update({ maxFileSize: n })}
+                  className={`px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${
+                    question.maxFileSize === n ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  {n} MB
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Accepted file types</label>
+            <input
+              value={(question.acceptedFileTypes ?? []).join(", ")}
+              onChange={(e) => update({ acceptedFileTypes: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
+              placeholder=".pdf, .doc, .docx, .jpg, .png"
+              className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+            />
+            <p className="text-xs text-muted-foreground mt-1">Comma-separated extensions</p>
+          </div>
+        </div>
+      )}
+
       <div className="pt-2 border-t border-border">
         <label className="flex items-center gap-3 cursor-pointer select-none">
           <div
@@ -505,6 +541,115 @@ function QuestionEditor({ question, index, onChange }: { question: Question; ind
           <span className="text-sm font-medium">Required</span>
         </label>
       </div>
+    </div>
+  );
+}
+
+// ─── Welcome Image Uploader ──────────────────────────────────────────────────
+
+const IMAGE_MAX_SIZE = 2 * 1024 * 1024; // 2 MB
+const IMAGE_ACCEPTED = [".jpg", ".jpeg", ".png", ".webp"];
+const SUPABASE_URL_FB = import.meta.env.VITE_SUPABASE_URL;
+
+function WelcomeImageUploader({
+  currentUrl,
+  formId,
+  onUploaded,
+}: {
+  currentUrl: string;
+  formId: string;
+  onUploaded: (url: string) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = async (file: File) => {
+    setError(null);
+
+    if (file.size > IMAGE_MAX_SIZE) {
+      setError("Image must be under 2 MB.");
+      return;
+    }
+
+    const ext = "." + file.name.split(".").pop()?.toLowerCase();
+    if (!IMAGE_ACCEPTED.includes(ext)) {
+      setError("Only .jpg, .jpeg, .png and .webp files are accepted.");
+      return;
+    }
+
+    setUploading(true);
+    const path = `welcome/${formId}/${Date.now()}-${file.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from("form-uploads")
+      .upload(path, file, { upsert: true });
+
+    if (uploadError) {
+      setError("Upload failed. Please try again.");
+      setUploading(false);
+      return;
+    }
+
+    const publicUrl = `${SUPABASE_URL_FB}/storage/v1/object/public/form-uploads/${path}`;
+    onUploaded(publicUrl);
+    setUploading(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  };
+
+  return (
+    <div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={IMAGE_ACCEPTED.join(",")}
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFile(file);
+        }}
+      />
+      {currentUrl ? (
+        <div className="relative rounded-xl overflow-hidden border border-border bg-muted/20">
+          <img src={currentUrl} alt="Welcome" className="w-full h-40 object-cover" />
+          <div className="absolute top-2 right-2 flex gap-1">
+            <button
+              onClick={() => inputRef.current?.click()}
+              className="p-1.5 rounded-lg bg-background/80 backdrop-blur-sm border border-border text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Upload size={13} />
+            </button>
+            <button
+              onClick={() => onUploaded("")}
+              className="p-1.5 rounded-lg bg-background/80 backdrop-blur-sm border border-border text-muted-foreground hover:text-destructive transition-colors"
+            >
+              <X size={13} />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          onClick={() => inputRef.current?.click()}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleDrop}
+          className="flex flex-col items-center justify-center gap-2 py-8 px-4 rounded-xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/3 cursor-pointer transition-all"
+        >
+          {uploading ? (
+            <Loader2 size={20} className="animate-spin text-muted-foreground" />
+          ) : (
+            <Upload size={20} className="text-muted-foreground" />
+          )}
+          <p className="text-xs text-muted-foreground">
+            {uploading ? "Uploading..." : "Drop an image or click to upload"}
+          </p>
+          <p className="text-[10px] text-muted-foreground/60">JPG, PNG, WebP · Max 2 MB</p>
+        </div>
+      )}
+      {error && <p className="text-xs text-destructive mt-1.5">{error}</p>}
     </div>
   );
 }
@@ -1343,12 +1488,11 @@ const FormBuilder = () => {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Image URL <span className="font-normal normal-case">(optional)</span></label>
-                        <input
-                          value={form.settings.welcomeScreen?.imageUrl ?? ""}
-                          onChange={(e) => setForm((f) => ({ ...f, settings: { ...f.settings, welcomeScreen: { ...f.settings.welcomeScreen, enabled: true, imageUrl: e.target.value } } }))}
-                          placeholder="https://example.com/hero.jpg"
-                          className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                        <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Image <span className="font-normal normal-case">(optional, max 2 MB)</span></label>
+                        <WelcomeImageUploader
+                          currentUrl={form.settings.welcomeScreen?.imageUrl ?? ""}
+                          formId={form.id}
+                          onUploaded={(url) => setForm((f) => ({ ...f, settings: { ...f.settings, welcomeScreen: { ...f.settings.welcomeScreen, enabled: true, imageUrl: url } } }))}
                         />
                       </div>
                       <div>
