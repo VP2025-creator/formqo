@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { Eye, EyeOff, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -27,6 +28,12 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex">
+      <Helmet>
+        <title>Sign In — Formqo</title>
+        <meta name="description" content="Sign in to your Formqo account to manage your forms, view responses, and access AI-powered form building tools." />
+        <link rel="canonical" href="https://formqo.lovable.app/login" />
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
       {/* Left panel */}
       <div className="hidden lg:flex lg:w-1/2 bg-primary flex-col justify-between p-12">
         <Logo height={28} invert className="mb-0" />
