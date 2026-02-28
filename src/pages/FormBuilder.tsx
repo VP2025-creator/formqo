@@ -451,70 +451,101 @@ function QuestionEditor({ question, index, onChange }: { question: Question; ind
 function LivePreview({ form, activeIdx, device }: { form: Form; activeIdx: number; device: "mobile" | "desktop" }) {
   const q = form.questions[activeIdx];
 
-  const containerClasses = device === "mobile"
-    ? "w-[320px] h-[580px] rounded-[2.5rem] border-[6px] border-foreground/80 overflow-hidden shadow-2xl"
-    : "w-full max-w-[900px] h-[560px] rounded-2xl border border-border overflow-hidden shadow-lg";
+  const isDesktop = device === "desktop";
+
+  const outerClasses = isDesktop
+    ? "w-full max-w-[960px]"
+    : "py-4";
+
+  const frameClasses = isDesktop
+    ? "w-full aspect-video rounded-xl border border-border overflow-hidden shadow-2xl"
+    : "w-[320px] h-[580px] rounded-[2.5rem] border-[6px] border-foreground/80 overflow-hidden shadow-2xl";
 
   return (
-    <div className={`flex items-center justify-center ${device === "mobile" ? "py-4" : ""}`}>
-      <div className={containerClasses}>
-        <div className="w-full h-full overflow-y-auto flex flex-col" style={{ background: "hsl(var(--foreground))", fontFamily: "'Inter', sans-serif" }}>
+    <div className={`flex items-center justify-center ${outerClasses}`}>
+      <div className={frameClasses}>
+        {/* Browser chrome for desktop */}
+        {isDesktop && (
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-foreground/95 border-b border-white/10 shrink-0">
+            <div className="flex gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-white/20" />
+              <div className="w-2.5 h-2.5 rounded-full bg-white/20" />
+              <div className="w-2.5 h-2.5 rounded-full bg-white/20" />
+            </div>
+            <div className="flex-1 mx-8">
+              <div className="bg-white/10 rounded-md px-3 py-1 text-white/40 text-[10px] font-mono text-center truncate">
+                share.formqo.com/f/{form.id.slice(0, 8)}…
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className={`w-full ${isDesktop ? "h-[calc(100%-36px)]" : "h-full"} overflow-y-auto flex flex-col`} style={{ background: "hsl(var(--foreground))", fontFamily: "'Inter', sans-serif" }}>
+          {/* Progress bar */}
           <div className="w-full h-0.5 bg-white/10 shrink-0">
             <div className="h-full bg-white transition-all" style={{ width: `${((activeIdx + 1) / Math.max(form.questions.length, 1)) * 100}%` }} />
           </div>
-          <div className="flex-1 p-6 flex flex-col justify-center">
+
+          <div className={`flex-1 flex flex-col justify-center ${isDesktop ? "px-16 py-12 max-w-2xl mx-auto w-full" : "p-6"}`}>
             {q ? (
               <>
-                <p className="text-white/40 text-xs mb-4 font-body">{activeIdx + 1} → {QUESTION_TYPES.find(t => t.type === q.type)?.label}</p>
-                <h3 className="font-display font-bold text-white text-lg leading-tight mb-2">
+                <p className={`text-white/40 mb-4 font-body ${isDesktop ? "text-sm" : "text-xs"}`}>
+                  {activeIdx + 1} → {QUESTION_TYPES.find(t => t.type === q.type)?.label}
+                </p>
+                <h3 className={`font-display font-bold text-white leading-tight mb-3 ${isDesktop ? "text-2xl" : "text-lg"}`}>
                   {q.required && <span className="text-primary">* </span>}
                   {q.title || <span className="opacity-30 italic font-normal">Untitled question</span>}
                 </h3>
-                {q.description && <p className="text-white/50 text-xs mb-4">{q.description}</p>}
+                {q.description && <p className={`text-white/50 mb-5 ${isDesktop ? "text-sm" : "text-xs"}`}>{q.description}</p>}
 
                 {(q.type === "short_text" || q.type === "email" || q.type === "number") && (
-                  <div className="border-b border-white/25 pb-2 text-white/30 text-sm">{q.placeholder || "Type your answer here..."}</div>
+                  <div className={`border-b border-white/25 pb-2 text-white/30 ${isDesktop ? "text-base" : "text-sm"}`}>
+                    {q.placeholder || "Type your answer here..."}
+                  </div>
                 )}
                 {q.type === "long_text" && (
-                  <div className="border border-white/20 rounded-lg p-3 text-white/30 text-xs h-16">{q.placeholder || "Type your answer here..."}</div>
+                  <div className={`border border-white/20 rounded-lg p-3 text-white/30 ${isDesktop ? "text-sm h-24" : "text-xs h-16"}`}>
+                    {q.placeholder || "Type your answer here..."}
+                  </div>
                 )}
                 {q.type === "rating" && (
                   <div className="flex gap-2 mt-2">
                     {Array.from({ length: q.maxRating ?? 5 }, (_, i) => (
-                      <div key={i} className="w-8 h-8 rounded-lg border border-white/25 flex items-center justify-center text-white/50 text-xs font-bold">{i + 1}</div>
+                      <div key={i} className={`rounded-lg border border-white/25 flex items-center justify-center text-white/50 font-bold ${isDesktop ? "w-11 h-11 text-sm" : "w-8 h-8 text-xs"}`}>{i + 1}</div>
                     ))}
                   </div>
                 )}
                 {q.type === "multiple_choice" && q.options && (
                   <div className="space-y-2 mt-2">
-                    {q.options.slice(0, 3).map((opt, i) => (
-                      <div key={opt.id} className="flex items-center gap-2 border border-white/20 rounded-lg px-3 py-2">
-                        <span className="text-white/30 text-xs w-4">{String.fromCharCode(65 + i)}</span>
-                        <span className="text-white/60 text-xs">{opt.label}</span>
+                    {q.options.slice(0, 4).map((opt, i) => (
+                      <div key={opt.id} className={`flex items-center gap-3 border border-white/20 rounded-lg ${isDesktop ? "px-4 py-3" : "px-3 py-2"}`}>
+                        <span className={`text-white/30 ${isDesktop ? "text-sm w-5" : "text-xs w-4"}`}>{String.fromCharCode(65 + i)}</span>
+                        <span className={`text-white/60 ${isDesktop ? "text-sm" : "text-xs"}`}>{opt.label}</span>
                       </div>
                     ))}
-                    {q.options.length > 3 && <p className="text-white/25 text-xs pl-1">+{q.options.length - 3} more</p>}
+                    {q.options.length > 4 && <p className="text-white/25 text-xs pl-1">+{q.options.length - 4} more</p>}
                   </div>
                 )}
                 {q.type === "yes_no" && (
                   <div className="flex gap-3 mt-2">
                     {["Yes", "No"].map((opt) => (
-                      <div key={opt} className="flex items-center gap-2 border border-white/20 rounded-lg px-4 py-2">
-                        <span className="text-white/30 text-xs">{opt === "Yes" ? "Y" : "N"}</span>
-                        <span className="text-white/60 text-sm">{opt}</span>
+                      <div key={opt} className={`flex items-center gap-2 border border-white/20 rounded-lg ${isDesktop ? "px-5 py-3" : "px-4 py-2"}`}>
+                        <span className={`text-white/30 ${isDesktop ? "text-sm" : "text-xs"}`}>{opt === "Yes" ? "Y" : "N"}</span>
+                        <span className={`text-white/60 ${isDesktop ? "text-base" : "text-sm"}`}>{opt}</span>
                       </div>
                     ))}
                   </div>
                 )}
 
-                <button className="mt-6 self-start flex items-center gap-2 bg-white text-foreground px-4 py-2 rounded-lg text-xs font-semibold">
-                  OK <ArrowLeft size={10} className="rotate-180" />
+                <button className={`mt-6 self-start flex items-center gap-2 bg-white text-foreground rounded-lg font-semibold ${isDesktop ? "px-5 py-2.5 text-sm" : "px-4 py-2 text-xs"}`}>
+                  OK <ArrowLeft size={isDesktop ? 12 : 10} className="rotate-180" />
                 </button>
               </>
             ) : (
-              <div className="text-center text-white/30"><p className="text-sm">No questions yet</p></div>
+              <div className="text-center text-white/30"><p className={isDesktop ? "text-base" : "text-sm"}>No questions yet</p></div>
             )}
           </div>
+
           <div className="flex justify-center pb-3">
             <p className="text-white/20 text-[10px]">Powered by <span className="font-bold">Formqo</span></p>
           </div>
