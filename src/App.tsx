@@ -20,6 +20,7 @@ import Pricing from "./pages/Pricing";
 import Settings from "./pages/Settings";
 import Templates from "./pages/Templates";
 import NotFound from "./pages/NotFound";
+import SubdomainGuard from "@/components/SubdomainGuard";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +32,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <SubdomainGuard />
           <Routes>
             {/* Pages WITHOUT the shared footer */}
             <Route path="/login" element={<Login />} />
