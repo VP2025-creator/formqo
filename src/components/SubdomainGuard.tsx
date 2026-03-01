@@ -1,40 +1,37 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { MARKETING_URL, APP_URL } from "@/lib/urls";
 
 /**
- * Routes that belong on app.formqo.com (the dashboard).
- * Everything else is considered a marketing/public route on formqo.com.
+ * Known production hostnames. Only redirect when BOTH domains are live.
  */
+const MARKETING_HOST = "formqo.com";
+const APP_HOST = "app.formqo.com";
+
 const APP_ROUTES = [
   "/dashboard",
   "/admin",
   "/builder",
   "/forms/",
   "/settings",
-  "/templates",
 ];
 
-/** Routes served on their own subdomain or shared across both */
-const SHARED_ROUTES = ["/login", "/signup", "/f/"];
+const SHARED_ROUTES = ["/login", "/signup", "/f/", "/templates", "/pricing"];
 
 function isAppRoute(pathname: string) {
   return APP_ROUTES.some(
-    (r) => pathname === r || pathname.startsWith(r + "/") || pathname.startsWith(r)
+    (r) => pathname === r || pathname.startsWith(r)
   );
 }
 
 function isSharedRoute(pathname: string) {
   return SHARED_ROUTES.some(
-    (r) => pathname === r || pathname.startsWith(r + "/") || pathname.startsWith(r)
+    (r) => pathname === r || pathname.startsWith(r)
   );
 }
 
 /**
- * Checks the current hostname against the expected subdomain for the active
- * route and performs a full redirect when there's a mismatch.
- *
- * Only runs in production (when hostname includes "formqo.com").
+ * Redirects users to the correct subdomain in production.
+ * Only activates when hostname is exactly formqo.com or app.formqo.com.
  */
 export default function SubdomainGuard() {
   const { pathname, search, hash } = useLocation();
@@ -42,21 +39,19 @@ export default function SubdomainGuard() {
   useEffect(() => {
     const host = window.location.hostname;
 
-    // Only enforce in production
-    if (!host.includes("formqo.com")) return;
+    // Only act on exact production hostnames
+    if (host !== MARKETING_HOST && host !== APP_HOST) return;
 
-    // Shared routes are fine on either domain
+    // Shared routes live on both domains
     if (isSharedRoute(pathname)) return;
 
-    const isOnApp = host.startsWith("app.");
+    const isOnApp = host === APP_HOST;
     const shouldBeOnApp = isAppRoute(pathname);
 
     if (shouldBeOnApp && !isOnApp) {
-      // Redirect to app subdomain
-      window.location.replace(`${APP_URL}${pathname}${search}${hash}`);
+      window.location.replace(`https://${APP_HOST}${pathname}${search}${hash}`);
     } else if (!shouldBeOnApp && isOnApp) {
-      // Redirect to marketing domain
-      window.location.replace(`${MARKETING_URL}${pathname}${search}${hash}`);
+      window.location.replace(`https://${MARKETING_HOST}${pathname}${search}${hash}`);
     }
   }, [pathname, search, hash]);
 
