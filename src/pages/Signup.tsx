@@ -49,7 +49,7 @@ const Signup = () => {
       <Helmet>
         <title>Create Account — Formqo | Free AI Form Builder</title>
         <meta name="description" content="Create your free Formqo account. Build beautiful AI-powered forms in minutes. No credit card required." />
-        <link rel="canonical" href="https://formqo.lovable.app/signup" />
+        <link rel="canonical" href="https://app.formqo.com/signup" />
         <meta property="og:title" content="Create Account — Formqo | Free AI Form Builder" />
         <meta property="og:description" content="Create your free Formqo account. Build beautiful AI-powered forms in minutes." />
         <meta name="robots" content="index, follow" />

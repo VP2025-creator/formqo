@@ -284,7 +284,7 @@ const Templates = () => {
       <Helmet>
         <title>Form Templates — Formqo | Free Professional Templates</title>
         <meta name="description" content="Browse 10+ professionally crafted form templates for feedback, research, HR, events, and lead generation. Clone and customise in seconds — free." />
-        <link rel="canonical" href="https://formqo.lovable.app/templates" />
+        <link rel="canonical" href="https://formqo.com/templates" />
         <meta property="og:title" content="Form Templates — Formqo | Free Professional Templates" />
         <meta property="og:description" content="Browse 10+ professionally crafted form templates. Clone and customise in seconds — free." />
         <meta name="robots" content="index, follow" />

@@ -31,7 +31,7 @@ const Login = () => {
       <Helmet>
         <title>Sign In — Formqo</title>
         <meta name="description" content="Sign in to your Formqo account to manage your forms, view responses, and access AI-powered form building tools." />
-        <link rel="canonical" href="https://formqo.lovable.app/login" />
+        <link rel="canonical" href="https://app.formqo.com/login" />
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       {/* Left panel */}
