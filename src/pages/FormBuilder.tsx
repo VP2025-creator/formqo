@@ -18,17 +18,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile.tsx";
 import FormqoAIChat from "@/components/FormqoAIChat";
 
-// ─── Formqo subdomain constants ──────────────────────────────────────────────
-const SHARE_BASE = "https://share.formqo.com/f";
-const EMBED_BASE = "https://embed.formqo.com";
-
-function getShareUrl(formId: string) {
-  return `${SHARE_BASE}/${formId}`;
-}
-
-function getEmbedSnippet(formId: string) {
-  return `<div id="formqo-${formId}"></div>\n<script src="${EMBED_BASE}/${formId}.js" async></script>`;
-}
+import { getShareUrl, getEmbedSnippet } from "@/lib/urls";
 
 // ─── Question type config ────────────────────────────────────────────────────
 

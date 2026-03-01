@@ -153,8 +153,8 @@ const orgJsonLd = {
   "@context": "https://schema.org",
   "@type": "Organization",
   name: "Formqo",
-  url: "https://formqo.lovable.app",
-  logo: "https://formqo.lovable.app/favicon.ico",
+  url: "https://formqo.com",
+  logo: "https://formqo.com/favicon.ico",
   description: "AI-powered form builder for modern teams. Build stunning, conversational forms in minutes.",
   sameAs: [],
 };
@@ -179,10 +179,10 @@ const Index = () => {
       <Helmet>
         <title>Formqo | AI-Powered Form Builder — Create Beautiful Forms Free</title>
         <meta name="description" content="Build stunning, conversational forms in minutes with Formqo's AI-powered form builder. Collect better data, understand your users, and automate workflows. Free forever, no credit card required." />
-        <link rel="canonical" href="https://formqo.lovable.app/" />
+        <link rel="canonical" href="https://formqo.com/" />
         <meta property="og:title" content="Formqo | AI-Powered Form Builder — Create Beautiful Forms Free" />
         <meta property="og:description" content="Build stunning, conversational forms in minutes with Formqo's AI-powered form builder. Collect better data, understand your users, and automate workflows." />
-        <meta property="og:url" content="https://formqo.lovable.app/" />
+        <meta property="og:url" content="https://formqo.com/" />
         <meta property="og:type" content="website" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Formqo | AI-Powered Form Builder — Create Beautiful Forms Free" />

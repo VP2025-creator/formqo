@@ -122,10 +122,10 @@ const Pricing = () => {
       <Helmet>
         <title>Pricing — Formqo | Simple, Honest Plans from £0/month</title>
         <meta name="description" content="Formqo pricing: Free forever at £0/mo, Pro at £19/mo with unlimited forms & AI, Business at £49/mo for teams. 14-day free trial, no credit card required." />
-        <link rel="canonical" href="https://formqo.lovable.app/pricing" />
+        <link rel="canonical" href="https://formqo.com/pricing" />
         <meta property="og:title" content="Pricing — Formqo | Simple, Honest Plans from £0/month" />
         <meta property="og:description" content="Start free. Upgrade to Pro or Business for unlimited forms, AI features, and team collaboration." />
-        <meta property="og:url" content="https://formqo.lovable.app/pricing" />
+        <meta property="og:url" content="https://formqo.com/pricing" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Pricing — Formqo | Simple, Honest Plans" />
         <meta name="robots" content="index, follow" />
