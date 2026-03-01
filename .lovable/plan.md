@@ -1,84 +1,42 @@
 
 
-## Update All Links and References to Use Formqo Subdomains
+## Cloudflare DNS and Subdomain Setup Guide
 
-Based on your subdomain architecture, this plan updates every hardcoded URL and reference across the codebase to point to the correct subdomain.
+This plan creates a comprehensive Markdown reference document (`docs/cloudflare-setup.md`) with full instructions for migrating DNS to Cloudflare and configuring every Formqo subdomain.
 
-### Subdomain mapping
+### What the guide will cover
 
-| Subdomain | Purpose |
-|---|---|
-| `formqo.com` | Marketing / homepage (canonical URLs, SEO meta) |
-| `app.formqo.com` | Dashboard / authenticated app |
-| `share.formqo.com` | Public form rendering |
-| `embed.formqo.com` | JS embed loader |
-| `api.formqo.com` | Backend API |
+1. **Transferring DNS to Cloudflare** -- adding the domain, updating nameservers at the registrar
+2. **DNS records for each subdomain:**
 
-### Changes
+| Subdomain | Type | Target | Proxy |
+|---|---|---|---|
+| `formqo.com` (root) | A or CNAME | Vercel / marketing host | Proxied |
+| `www.formqo.com` | CNAME | `formqo.com` | Proxied |
+| `app.formqo.com` | CNAME | `formqo.lovable.app` | DNS-only |
+| `share.formqo.com` | Worker route | Cloudflare Worker | Proxied |
+| `embed.formqo.com` | Worker route | Cloudflare Worker | Proxied |
+| `api.formqo.com` | CNAME | `vsznqfhfbqqajgexzzky.supabase.co` | DNS-only |
 
-**1. Create a central constants file (`src/lib/urls.ts`)**
+3. **Lovable custom domain setup** -- connecting `app.formqo.com` in Lovable project settings
+4. **Cloudflare Worker setup** for `share.formqo.com` -- route binding, Worker script skeleton for fetching form data and rendering HTML
+5. **Embed loader** on `embed.formqo.com` -- lightweight JS snippet served by a Worker or Pages
+6. **API proxy** on `api.formqo.com` -- proxying to the backend edge functions
+7. **SSL/TLS settings** -- Full (Strict) mode, edge certificates, HSTS
+8. **Email DNS records** -- MX, SPF, DKIM, DMARC for `@formqo.com` email
+9. **Verification checklist** -- commands to confirm each subdomain resolves correctly
 
-A single source of truth for all subdomain URLs, making future changes easy:
-- `MARKETING_URL = "https://formqo.com"`
-- `APP_URL = "https://app.formqo.com"`
-- `SHARE_URL = "https://share.formqo.com"`
-- `EMBED_URL = "https://embed.formqo.com"`
-- `API_URL = "https://api.formqo.com"`
-- Helper functions: `getShareUrl(formId)`, `getEmbedUrl(formId)`
-
-**2. Update `index.html` (static SEO fallback)**
-
-Replace all `formqo.lovable.app` references with `formqo.com`:
-- Canonical URL -> `https://formqo.com/`
-- Open Graph URLs -> `https://formqo.com/`
-
-**3. Update page-level SEO meta (Helmet tags)**
-
-Replace `formqo.lovable.app` with `formqo.com` in canonical/OG URLs across:
-- `Index.tsx` -- canonical, og:url, Organization schema URL
-- `Pricing.tsx` -- canonical, og:url
-- `Templates.tsx` -- canonical
-- `Login.tsx` -- canonical (-> `app.formqo.com/login`)
-- `Signup.tsx` -- canonical (-> `app.formqo.com/signup`)
-
-**4. Update `FormBuilder.tsx`**
-
-- Remove the inline `SHARE_BASE` / `EMBED_BASE` constants
-- Import from the new `src/lib/urls.ts` instead
-- All share/embed references automatically use the correct subdomains
-
-**5. Update `AdminDashboard.tsx`**
-
-- Share link (`https://share.formqo.com/f/{id}`) -- import from constants
-- Placeholder text referencing `share.formqo.com` stays as-is (already correct)
-
-**6. Update `Footer.tsx`**
-
-- Wire up the Product links (Features, Pricing, Templates) to use proper paths
-- "Integrations" link points to `/dashboard/integrations`
-
-**7. Update `Logo.tsx`**
-
-- When used on marketing pages, links to `/` (current behavior, fine)
-- The Navbar already passes `to="/dashboard"` for the app shell -- no change needed
-
-**8. No changes needed for:**
-- `submit-form/index.ts` edge function -- already references `share.formqo.com` correctly
-- `Settings.tsx` -- `support@formqo.com` email is correct
-- `Pricing.tsx` -- `hello@formqo.com` email is correct
-
-### Summary of files to create/edit
+### File to create
 
 | File | Action |
 |---|---|
-| `src/lib/urls.ts` | Create (new constants file) |
-| `index.html` | Edit (update canonical/OG URLs) |
-| `src/pages/Index.tsx` | Edit (SEO URLs) |
-| `src/pages/Pricing.tsx` | Edit (SEO URLs) |
-| `src/pages/Templates.tsx` | Edit (SEO URLs) |
-| `src/pages/Login.tsx` | Edit (canonical URL) |
-| `src/pages/Signup.tsx` | Edit (canonical URL) |
-| `src/pages/FormBuilder.tsx` | Edit (import constants) |
-| `src/pages/AdminDashboard.tsx` | Edit (import constants) |
-| `src/components/Footer.tsx` | Edit (wire up links) |
+| `docs/cloudflare-setup.md` | Create -- full setup guide |
+
+### Technical details
+
+- The guide will reference the actual Lovable published URL (`formqo.lovable.app`) for the `app` CNAME target
+- For `api.formqo.com`, it will reference the backend URL pattern for edge functions
+- Worker code examples will include the form-fetching logic and CORS headers matching the existing `submit-form` edge function patterns
+- The `app.formqo.com` CNAME must use DNS-only (grey cloud) mode because Lovable provisions its own SSL certificate and Cloudflare proxy would break the verification
+- Email records section will include placeholder values for the user to fill in from their email provider
 
