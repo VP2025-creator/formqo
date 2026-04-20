@@ -1,18 +1,20 @@
-// ─── Formqo subdomain constants ──────────────────────────────────────────────
-export const MARKETING_URL = "https://formqo.com";
-export const APP_URL = "https://app.formqo.com";
-export const SHARE_URL = "https://share.formqo.com";
-export const EMBED_URL = "https://embed.formqo.com";
-export const API_URL = "https://api.formqo.com";
+// ─── Formqo URL helpers ──────────────────────────────────────────────────────
+// Everything is served from a single origin (typically https://formqo.com).
+// Helpers derive absolute URLs from window.location at runtime so they work
+// across preview, production, and custom domains without hard-coding hosts.
 
-export function getShareUrl(formId: string) {
-  return `${SHARE_URL}/f/${formId}`;
+function getOrigin(): string {
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return window.location.origin;
+  }
+  return "https://formqo.com";
 }
 
-export function getEmbedUrl(formId: string) {
-  return `${EMBED_URL}/${formId}.js`;
+export function getShareUrl(formId: string) {
+  return `${getOrigin()}/f/${formId}`;
 }
 
 export function getEmbedSnippet(formId: string) {
-  return `<div id="formqo-${formId}"></div>\n<script src="${getEmbedUrl(formId)}" async></script>`;
+  const src = `${getOrigin()}/embed/${formId}.js`;
+  return `<div id="formqo-${formId}"></div>\n<script src="${src}" async></script>`;
 }
